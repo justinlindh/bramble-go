@@ -2,129 +2,248 @@ package bramble
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/justinlindh/bramble-go/transport"
 )
 
-func setupClient(t *testing.T) (*Client, *transport.MockTransport) {
+// setupRawClient creates a Client with mock transport without running Connect.
+func setupRawClient(t *testing.T) (*Client, *transport.MockTransport) {
 	t.Helper()
 	mock := transport.NewMock()
-	client := NewClient(mock)
-	return client, mock
+	ctx := context.Background()
+	if err := mock.Connect(ctx); err != nil {
+		t.Fatalf("mock.Connect: %v", err)
+	}
+	c := &Client{t: mock}
+	c.proto = NewProtocol(mock)
+	c.proto.Start()
+	go c.notifyLoop()
+	return c, mock
 }
 
-func connectClient(t *testing.T, client *Client, mock *transport.MockTransport) {
-	t.Helper()
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"firmware_version":"0.1.0-dev","protocol_version":"0.1.0","hardware":"heltec_v3"}}`)
+func TestClient_Connect(t *testing.T) {
+	mock := transport.NewMock()
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"firmware_version":"0.1.0","protocol_version":"0.1.0","hardware":"heltec_v3"}}`)
+	c := NewClient(mock)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if err := client.Connect(ctx); err != nil {
-		t.Fatalf("Connect failed: %v", err)
+	if err := c.Connect(ctx); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer c.Close()
+}
+
+func TestClient_Connect_Incompatible(t *testing.T) {
+	mock := transport.NewMock()
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"firmware_version":"99.0.0","protocol_version":"99.0.0","hardware":"esp32"}}`)
+	c := NewClient(mock)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := c.Connect(ctx); err == nil {
+		t.Fatal("expected error for incompatible protocol version")
 	}
 }
 
-func TestClientConnect(t *testing.T) {
-	client, mock := setupClient(t)
-	defer client.Close()
-	connectClient(t, client, mock)
-}
+func TestClient_Status(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
 
-func TestClientConnectIncompatible(t *testing.T) {
-	client, mock := setupClient(t)
-	defer client.Close()
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"firmware_version":"2.0.0","protocol_version":"2.0.0","hardware":"heltec_v3"}}`)
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	err := client.Connect(ctx)
-	if err == nil {
-		t.Fatal("expected error for incompatible version")
-	}
-}
-
-func TestClientStatus(t *testing.T) {
-	client, mock := setupClient(t)
-	defer client.Close()
-	connectClient(t, client, mock)
-
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":2,"result":{"address":"1191C6E0","firmware_version":"0.1.0-dev","protocol_version":"0.1.0","hardware":"heltec_v3","radio_ok":true,"peers":2,"beacon_tx":10,"beacon_rx":8,"packets_tx":5,"packets_rx":3,"uptime_s":120}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"address":"1191C6E0","firmware_version":"0.1.0-dev","protocol_version":"0.1.0","hardware":"heltec_v3","radio_ok":true,"peers":2,"beacon_tx":10,"beacon_rx":20,"packets_tx":10,"packets_rx":20,"uptime_s":3600}}`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	status, err := client.Status(ctx)
+
+	status, err := c.Status(ctx)
 	if err != nil {
-		t.Fatalf("Status failed: %v", err)
+		t.Fatalf("Status error: %v", err)
 	}
-	if status.Address != "1191C6E0" {
-		t.Errorf("expected address 1191C6E0, got %s", status.Address)
+	if status.UptimeSec != 3600 {
+		t.Errorf("uptime_s: got %d, want 3600", status.UptimeSec)
 	}
 	if status.Peers != 2 {
-		t.Errorf("expected 2 peers, got %d", status.Peers)
+		t.Errorf("peers: got %d, want 2", status.Peers)
 	}
-	if !status.RadioOK {
-		t.Error("expected radio_ok true")
-	}
-}
-
-func TestClientPing(t *testing.T) {
-	client, mock := setupClient(t)
-	defer client.Close()
-	connectClient(t, client, mock)
-
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":2,"result":{"pong":true}}`)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-	if err := client.Ping(ctx); err != nil {
-		t.Fatalf("Ping failed: %v", err)
+	if status.Address != "1191C6E0" {
+		t.Errorf("address: got %q, want 1191C6E0", status.Address)
 	}
 }
 
-func TestClientSend(t *testing.T) {
-	client, mock := setupClient(t)
-	defer client.Close()
-	connectClient(t, client, mock)
+func TestClient_Neighbors(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
 
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":2,"result":{"message_id":"abc123","status":"sent"}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"neighbors":[{"address":"12345678","rssi":-75,"snr":8.5,"last_seen_ms":1000},{"address":"DEADBEEF","rssi":-90,"snr":4.2,"last_seen_ms":2000}]}}`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	result, err := client.Send(ctx, "6EEA8967", "hello")
+
+	neighbors, err := c.Neighbors(ctx)
 	if err != nil {
-		t.Fatalf("Send failed: %v", err)
+		t.Fatalf("Neighbors error: %v", err)
 	}
-	if result.MessageID != "abc123" {
-		t.Errorf("expected message_id abc123, got %s", result.MessageID)
+	if len(neighbors) != 2 {
+		t.Fatalf("expected 2 neighbors, got %d", len(neighbors))
 	}
-
-	sent := mock.Sent()
-	if len(sent) < 2 {
-		t.Fatalf("expected at least 2 sent messages, got %d", len(sent))
+	if neighbors[0].Address != "12345678" {
+		t.Errorf("address: got %q, want 12345678", neighbors[0].Address)
 	}
-	var req rpcRequest
-	json.Unmarshal([]byte(sent[len(sent)-1]), &req)
-	if req.Method != "bramble.sendMessage" {
-		t.Errorf("expected method bramble.sendMessage, got %s", req.Method)
+	if neighbors[0].RSSI != -75 {
+		t.Errorf("rssi: got %d, want -75", neighbors[0].RSSI)
 	}
 }
 
-func TestClientRPCError(t *testing.T) {
-	client, mock := setupClient(t)
-	defer client.Close()
-	connectClient(t, client, mock)
+func TestClient_Ping(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"pong":true,"address":"4A555354","protocol_version":"0.1.0"}}`)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if err := c.Ping(ctx); err != nil {
+		t.Fatalf("Ping error: %v", err)
+	}
+}
 
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":2,"error":{"code":-1001,"message":"Radio not ready"}}`)
+func TestClient_Send(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"message_id":"TODO","status":"sent"}}`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	_, err := client.Status(ctx)
-	if err == nil {
-		t.Fatal("expected error")
+
+	result, err := c.Send(ctx, 0x12345678, "hello mesh")
+	if err != nil {
+		t.Fatalf("Send error: %v", err)
 	}
-	// Verify we got an error (the exact type is internal)
-	if err.Error() == "" {
-		t.Error("expected non-empty error message")
+	if result.Status != "sent" {
+		t.Errorf("status: got %q, want sent", result.Status)
+	}
+}
+
+func TestClient_Broadcast(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"message_id":"TODO","status":"sent"}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	result, err := c.Broadcast(ctx, "hello everyone")
+	if err != nil {
+		t.Fatalf("Broadcast error: %v", err)
+	}
+	if result.Status != "sent" {
+		t.Errorf("status: got %q, want sent", result.Status)
+	}
+}
+
+func TestClient_OnMessage(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	received := make(chan Message, 1)
+	c.OnMessage(func(m Message) { received <- m })
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onMessage","params":{"from":"00000001","to":"00000002","text":"hey","timestamp":9999}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	select {
+	case m := <-received:
+		if m.Text != "hey" {
+			t.Errorf("text: got %q, want hey", m.Text)
+		}
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for OnMessage callback")
+	}
+}
+
+func TestClient_OnAck(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	received := make(chan Ack, 1)
+	c.OnAck(func(a Ack) { received <- a })
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onAck","params":{"packetId":42,"status":"delivered"}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	select {
+	case a := <-received:
+		if a.PacketID != 42 {
+			t.Errorf("packetId: got %d, want 42", a.PacketID)
+		}
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for OnAck callback")
+	}
+}
+
+func TestClient_OnNeighborChange(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	fired := make(chan struct{}, 1)
+	c.OnNeighborChange(func() { fired <- struct{}{} })
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onNeighborChange","params":{}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	select {
+	case <-fired:
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for OnNeighborChange callback")
+	}
+}
+
+func TestClient_Config(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"node_name":"mynode","address":"1191C6E0","radio":{"frequency_mhz":915,"sf":9,"bw_hz":125000,"tx_power_dbm":17,"profile":"long_range"},"channels":[{"id":0,"name":"public","is_default":true}]}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	cfg, err := c.Config(ctx)
+	if err != nil {
+		t.Fatalf("Config error: %v", err)
+	}
+	if cfg.NodeName != "mynode" {
+		t.Errorf("node_name: got %q, want mynode", cfg.NodeName)
+	}
+	if cfg.Radio.FrequencyMhz != 915 {
+		t.Errorf("frequency_mhz: got %d, want 915", cfg.Radio.FrequencyMhz)
+	}
+}
+
+func TestClient_SetRadio(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"ok":true}}`)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	sf := 10
+	if err := c.SetRadio(ctx, RadioConfig{SF: &sf}); err != nil {
+		t.Fatalf("SetRadio error: %v", err)
+	}
+}
+
+func TestClient_RPCError(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"method not found"}}`)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if _, err := c.Status(ctx); err == nil {
+		t.Fatal("expected error for RPC error response")
 	}
 }

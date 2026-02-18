@@ -27,7 +27,6 @@ func TestProtocol_Call(t *testing.T) {
 	p, mock := newConnectedProtocol(t)
 	defer p.Stop()
 
-	// Queue a response before calling so the reader goroutine can pick it up.
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"pong":true,"address":"AABBCCDD","protocol_version":"0.1.0"}}`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -46,27 +45,26 @@ func TestProtocol_Call(t *testing.T) {
 		t.Error("expected pong=true")
 	}
 	if result.Address != "AABBCCDD" {
-		t.Errorf("address: got %q, want %q", result.Address, "AABBCCDD")
+		t.Errorf("address: got %q, want AABBCCDD", result.Address)
 	}
 
-	// Verify the request was sent correctly.
 	sent := mock.Sent()
 	if len(sent) != 1 {
 		t.Fatalf("expected 1 sent message, got %d", len(sent))
 	}
 	var req rpcRequest
 	if err := json.Unmarshal([]byte(sent[0]), &req); err != nil {
-		t.Fatalf("unmarshal sent request: %v", err)
+		t.Fatalf("unmarshal sent: %v", err)
 	}
 	if req.Method != "bramble.ping" {
-		t.Errorf("method: got %q, want %q", req.Method, "bramble.ping")
+		t.Errorf("method: got %q, want bramble.ping", req.Method)
 	}
 	if req.JSONRPC != "2.0" {
-		t.Errorf("jsonrpc: got %q, want %q", req.JSONRPC, "2.0")
+		t.Errorf("jsonrpc: got %q, want 2.0", req.JSONRPC)
 	}
 }
 
-// TestProtocol_RPCError verifies that RPC error responses are propagated as errors.
+// TestProtocol_RPCError verifies that RPC error responses surface as errors.
 func TestProtocol_RPCError(t *testing.T) {
 	p, mock := newConnectedProtocol(t)
 	defer p.Stop()
@@ -102,8 +100,7 @@ func TestProtocol_Notification(t *testing.T) {
 	p, mock := newConnectedProtocol(t)
 	defer p.Stop()
 
-	// Queue a notification (no "id" field).
-	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onMessage","params":{"from":"1191C6E0","to":"6EEA8967","text":"hi","timestamp":1000}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onMessage","params":{"from":"00000001","to":"00000002","text":"hi","timestamp":1000}}`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -111,33 +108,46 @@ func TestProtocol_Notification(t *testing.T) {
 	select {
 	case n := <-p.Notifications():
 		if n.Method != "bramble.onMessage" {
-			t.Errorf("method: got %q, want %q", n.Method, "bramble.onMessage")
+			t.Errorf("method: got %q, want bramble.onMessage", n.Method)
 		}
 		var m Message
 		if err := json.Unmarshal(n.Params, &m); err != nil {
-			t.Fatalf("unmarshal notification params: %v", err)
+			t.Fatalf("unmarshal params: %v", err)
 		}
 		if m.Text != "hi" {
-			t.Errorf("text: got %q, want %q", m.Text, "hi")
+			t.Errorf("text: got %q, want hi", m.Text)
 		}
 	case <-ctx.Done():
 		t.Fatal("timed out waiting for notification")
 	}
 }
 
-// TestProtocol_SequentialCalls verifies multiple calls are correctly correlated by ID.
-func TestProtocol_SequentialCalls(t *testing.T) {
+// TestProtocol_ConcurrentCalls verifies multiple concurrent calls are correctly correlated.
+func TestProtocol_ConcurrentCalls(t *testing.T) {
 	p, mock := newConnectedProtocol(t)
 	defer p.Stop()
 
+	const n = 5
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	for i := 1; i <= 3; i++ {
+	errs := make(chan error, n)
+	for i := 0; i < n; i++ {
+		go func() {
+			_, err := p.Call(ctx, "bramble.getStatus", nil)
+			errs <- err
+		}()
+	}
+
+	// Give goroutines time to register pending channels, then feed responses.
+	time.Sleep(20 * time.Millisecond)
+	for i := 1; i <= n; i++ {
 		mock.QueueResponse(fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"result":{"idx":%d}}`, i, i))
-		_, err := p.Call(ctx, "bramble.getStatus", nil)
-		if err != nil {
-			t.Errorf("call %d error: %v", i, err)
+	}
+
+	for i := 0; i < n; i++ {
+		if err := <-errs; err != nil {
+			t.Errorf("concurrent call error: %v", err)
 		}
 	}
 }

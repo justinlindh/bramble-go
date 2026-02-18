@@ -219,9 +219,9 @@ func (c *Client) PeerLocations(ctx context.Context) ([]LocationPeer, error) {
 // ── Action / Config Methods ───────────────────────────────────────────────────
 
 // Send sends a unicast text message to dest (uint32 address).
-// Returns a SendResult containing the packetId for delivery tracking via OnAck.
+// Returns a SendResult containing the message_id for delivery tracking via OnAck.
 func (c *Client) Send(ctx context.Context, dest uint32, text string) (*SendResult, error) {
-	params := map[string]any{"dest": dest, "text": text}
+	params := map[string]any{"dest": fmt.Sprintf("%08X", dest), "text": text}
 	raw, err := c.proto.Call(ctx, "bramble.sendMessage", params)
 	if err != nil {
 		return nil, err
@@ -233,9 +233,18 @@ func (c *Client) Send(ctx context.Context, dest uint32, text string) (*SendResul
 	return &resp, nil
 }
 
-// Broadcast sends a text message to all peers (dest = 0xFFFFFFFF).
+// Broadcast sends a text message to all peers on the public channel.
 func (c *Client) Broadcast(ctx context.Context, text string) (*SendResult, error) {
-	return c.Send(ctx, 0xFFFFFFFF, text)
+	params := map[string]any{"text": text}
+	raw, err := c.proto.Call(ctx, "bramble.sendBroadcast", params)
+	if err != nil {
+		return nil, err
+	}
+	var resp SendResult
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode SendResult: %w", err)
+	}
+	return &resp, nil
 }
 
 // SendProbe broadcasts a probe packet. Results arrive as notifications.
