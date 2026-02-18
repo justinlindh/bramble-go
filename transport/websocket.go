@@ -2,20 +2,38 @@ package transport
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"nhooyr.io/websocket"
 )
 
+// ErrReconnecting is returned when a method is called while the WebSocket is reconnecting.
+var ErrReconnecting = errors.New("bramble/transport/websocket: reconnecting")
+
 // WebSocket is a Transport that communicates with a Bramble node over a WebSocket connection.
 // Each WebSocket message frame carries exactly one JSON-RPC message; no newline framing is used.
+//
+// If the connection drops unexpectedly, WebSocket will automatically attempt to reconnect
+// using exponential backoff (1s, 2s, 4s, 8s, … up to 30s). During reconnection, Send
+// returns ErrReconnecting. The Receive loop detects disconnects and drives reconnection.
 type WebSocket struct {
-	url    string
-	mu     sync.Mutex
-	conn   *websocket.Conn
-	done   chan struct{}
-	once   sync.Once
+	url  string
+	mu   sync.Mutex
+	conn *websocket.Conn
+	done chan struct{}
+	once sync.Once
+
+	// reconnecting is true while a reconnect attempt is in progress.
+	reconnecting bool
+
+	// OnDisconnect is called (if non-nil) when the connection is lost unexpectedly.
+	OnDisconnect func()
+
+	// OnReconnect is called (if non-nil) after a successful reconnection.
+	OnReconnect func()
 }
 
 // NewWebSocket creates a new WebSocket transport for the given URL.
@@ -36,7 +54,6 @@ func (w *WebSocket) Connect(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("bramble/transport/websocket: dial %s: %w", w.url, err)
 	}
-	// Allow large payloads (default is 32KB which may be tight for full config dumps).
 	conn.SetReadLimit(512 * 1024)
 	w.conn = conn
 	return nil
@@ -46,8 +63,12 @@ func (w *WebSocket) Connect(ctx context.Context) error {
 func (w *WebSocket) Send(data []byte) error {
 	w.mu.Lock()
 	conn := w.conn
+	reconnecting := w.reconnecting
 	w.mu.Unlock()
 
+	if reconnecting {
+		return ErrReconnecting
+	}
 	if conn == nil {
 		return ErrNotConnected
 	}
@@ -60,6 +81,7 @@ func (w *WebSocket) Send(data []byte) error {
 }
 
 // Receive blocks until a WebSocket message is available or the context is cancelled.
+// On unexpected disconnect, it triggers automatic reconnection with exponential backoff.
 func (w *WebSocket) Receive(ctx context.Context) ([]byte, error) {
 	w.mu.Lock()
 	conn := w.conn
@@ -71,14 +93,83 @@ func (w *WebSocket) Receive(ctx context.Context) ([]byte, error) {
 
 	_, data, err := conn.Read(ctx)
 	if err != nil {
+		// Check if we're intentionally closed.
 		select {
 		case <-w.done:
 			return nil, ErrClosed
 		default:
 		}
-		return nil, fmt.Errorf("bramble/transport/websocket: read: %w", err)
+
+		// Check if context was cancelled (not a disconnect).
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
+		// Unexpected disconnect — attempt reconnect.
+		if rerr := w.reconnect(); rerr != nil {
+			return nil, fmt.Errorf("bramble/transport/websocket: reconnect failed: %w", rerr)
+		}
+
+		// Reconnected — return a sentinel so the caller retries.
+		return nil, ErrReconnecting
 	}
 	return data, nil
+}
+
+// reconnect attempts to re-establish the WebSocket connection with exponential backoff.
+// Backoff: 1s, 2s, 4s, 8s, 16s, 30s (max). Stops if Close() is called.
+func (w *WebSocket) reconnect() error {
+	w.mu.Lock()
+	if w.reconnecting {
+		w.mu.Unlock()
+		return nil // another goroutine is already reconnecting
+	}
+	w.reconnecting = true
+	onDisconnect := w.OnDisconnect
+	w.mu.Unlock()
+
+	if onDisconnect != nil {
+		onDisconnect()
+	}
+
+	delay := time.Second
+	const maxDelay = 30 * time.Second
+
+	for {
+		select {
+		case <-w.done:
+			w.mu.Lock()
+			w.reconnecting = false
+			w.mu.Unlock()
+			return ErrClosed
+		default:
+		}
+
+		time.Sleep(delay)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		conn, _, err := websocket.Dial(ctx, w.url, nil)
+		cancel()
+
+		if err == nil {
+			conn.SetReadLimit(512 * 1024)
+			w.mu.Lock()
+			w.conn = conn
+			w.reconnecting = false
+			onReconnect := w.OnReconnect
+			w.mu.Unlock()
+
+			if onReconnect != nil {
+				onReconnect()
+			}
+			return nil
+		}
+
+		delay *= 2
+		if delay > maxDelay {
+			delay = maxDelay
+		}
+	}
 }
 
 // Close sends a WebSocket close frame and closes the connection.
