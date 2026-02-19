@@ -26,6 +26,10 @@ func WithBaudRate(baud int) SerialOption {
 // Serial is a Transport that communicates with a Bramble node over a UART/serial port.
 // Messages are newline-delimited JSON. Lines not starting with '{' (e.g., ESP-IDF log
 // output and console prompts) are skipped transparently.
+//
+// If the connection drops unexpectedly (e.g., USB unplug), Serial will automatically
+// attempt to reconnect using exponential backoff (1s, 2s, 4s, 8s, … up to 30s).
+// During reconnection, Send returns ErrReconnecting.
 type Serial struct {
 	port    string
 	baud    int
@@ -36,6 +40,15 @@ type Serial struct {
 	errCh   chan error
 	done    chan struct{}
 	once    sync.Once
+
+	// reconnecting is true while a reconnect attempt is in progress.
+	reconnecting bool
+
+	// OnDisconnect is called (if non-nil) when the connection is lost unexpectedly.
+	OnDisconnect func()
+
+	// OnReconnect is called (if non-nil) after a successful reconnection.
+	OnReconnect func()
 }
 
 // NewSerial creates a new Serial transport for the given port.
@@ -79,6 +92,7 @@ func (s *Serial) Connect(_ context.Context) error {
 
 // reader is the background goroutine that reads lines from the serial port.
 // Lines that don't start with '{' are ESP-IDF logs or prompts and are discarded.
+// On fatal read errors (e.g., USB disconnect), it triggers automatic reconnection.
 func (s *Serial) reader() {
 	for {
 		select {
@@ -100,10 +114,16 @@ func (s *Serial) reader() {
 			default:
 			}
 			if err != nil {
-				select {
-				case s.errCh <- fmt.Errorf("bramble/transport/serial: read: %w", err):
-				default:
+				// Fatal read error (USB disconnect, etc.) — attempt reconnect.
+				if rerr := s.reconnect(); rerr != nil {
+					select {
+					case s.errCh <- fmt.Errorf("bramble/transport/serial: reconnect failed: %w", rerr):
+					default:
+					}
+					return
 				}
+				// Reconnected — continue reading with new scanner.
+				continue
 			}
 			// If Scan returned false with no error it may be a timeout — retry.
 			s.scanner = bufio.NewScanner(s.conn)
@@ -125,11 +145,79 @@ func (s *Serial) reader() {
 	}
 }
 
+// reconnect attempts to re-open the serial port with exponential backoff.
+// Backoff: 1s, 2s, 4s, 8s, 16s, 30s (max). Stops if Close() is called.
+func (s *Serial) reconnect() error {
+	s.mu.Lock()
+	if s.reconnecting {
+		s.mu.Unlock()
+		return nil
+	}
+	s.reconnecting = true
+	// Close the old connection.
+	if s.conn != nil {
+		_ = s.conn.Close()
+		s.conn = nil
+	}
+	onDisconnect := s.OnDisconnect
+	s.mu.Unlock()
+
+	if onDisconnect != nil {
+		onDisconnect()
+	}
+
+	delay := time.Second
+	const maxDelay = 30 * time.Second
+
+	mode := &serial.Mode{
+		BaudRate: s.baud,
+		DataBits: 8,
+		Parity:   serial.NoParity,
+		StopBits: serial.OneStopBit,
+	}
+
+	for {
+		select {
+		case <-s.done:
+			s.mu.Lock()
+			s.reconnecting = false
+			s.mu.Unlock()
+			return ErrClosed
+		default:
+		}
+
+		time.Sleep(delay)
+
+		conn, err := serial.Open(s.port, mode)
+		if err == nil {
+			s.mu.Lock()
+			s.conn = conn
+			s.scanner = bufio.NewScanner(conn)
+			s.reconnecting = false
+			onReconnect := s.OnReconnect
+			s.mu.Unlock()
+
+			if onReconnect != nil {
+				onReconnect()
+			}
+			return nil
+		}
+
+		delay *= 2
+		if delay > maxDelay {
+			delay = maxDelay
+		}
+	}
+}
+
 // Send writes a JSON payload followed by a newline to the serial port.
 func (s *Serial) Send(data []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if s.reconnecting {
+		return ErrReconnecting
+	}
 	if s.conn == nil {
 		return ErrNotConnected
 	}
