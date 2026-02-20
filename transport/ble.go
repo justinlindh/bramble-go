@@ -37,15 +37,15 @@ type BLEConfig struct {
 
 // BLE implements Transport over BLE using the Nordic UART Service.
 type BLE struct {
-	cfg        BLEConfig
-	adapter    *bluetooth.Adapter
-	device     bluetooth.Device
-	txChar     bluetooth.DeviceCharacteristic
-	connected  bool
-	mu         sync.Mutex
-	recvCh     chan []byte
-	lineBuf    strings.Builder
-	closeCh    chan struct{}
+	cfg       BLEConfig
+	adapter   *bluetooth.Adapter
+	device    bluetooth.Device
+	txChar    bluetooth.DeviceCharacteristic
+	connected bool
+	mu        sync.Mutex
+	recvCh    chan []byte
+	lineBuf   strings.Builder
+	closeCh   chan struct{}
 }
 
 // NewBLE creates a new BLE transport.
@@ -193,7 +193,8 @@ func (b *BLE) Send(data []byte) error {
 	// Append newline delimiter
 	payload := append(data, '\n')
 
-	// Write in chunks (BLE characteristic write max ~240 bytes typically)
+	// Write in chunks sized for a common ATT payload limit.
+	// With default MTU 247, payload is typically 240 bytes after protocol overhead.
 	const chunkSize = 240
 	for i := 0; i < len(payload); i += chunkSize {
 		end := i + chunkSize
@@ -237,7 +238,7 @@ func (b *BLE) Close() error {
 // Info returns a description of the BLE transport.
 func (b *BLE) Info() string {
 	if b.cfg.DeviceName != "" {
-		return fmt.Sprintf("ble (%s)", b.cfg.DeviceName)
+		return fmt.Sprintf("ble:%s", b.cfg.DeviceName)
 	}
-	return "ble (auto-scan)"
+	return "ble:auto-scan"
 }

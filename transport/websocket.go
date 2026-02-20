@@ -2,16 +2,12 @@ package transport
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"nhooyr.io/websocket"
 )
-
-// ErrReconnecting is returned when a method is called while the WebSocket is reconnecting.
-var ErrReconnecting = errors.New("bramble/transport/websocket: reconnecting")
 
 // WebSocket is a Transport that communicates with a Bramble node over a WebSocket connection.
 // Each WebSocket message frame carries exactly one JSON-RPC message; no newline framing is used.

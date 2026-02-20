@@ -32,3 +32,6 @@ var ErrNotConnected = errors.New("bramble/transport: not connected")
 
 // ErrClosed is returned when an operation is attempted on a closed transport.
 var ErrClosed = errors.New("bramble/transport: transport closed")
+
+// ErrReconnecting is returned when a method is called while a transport is reconnecting.
+var ErrReconnecting = errors.New("bramble/transport: reconnecting")

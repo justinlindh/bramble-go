@@ -52,10 +52,12 @@ type PingResponse struct {
 // Neighbor represents a directly heard radio neighbor.
 // Firmware sends "address" as hex string, not numeric.
 type Neighbor struct {
-	Address     string  `json:"address"`
-	RSSI        int     `json:"rssi"`
-	SNR         float64 `json:"snr"`
-	LastHeardMs int64   `json:"last_seen_ms"`
+	Address string  `json:"address"`
+	RSSI    int     `json:"rssi"`
+	SNR     float64 `json:"snr"`
+	// LastSeenAgoMs is milliseconds since this neighbor was last heard
+	// (relative duration, not an absolute timestamp).
+	LastSeenAgoMs int64 `json:"last_seen_ms"`
 }
 
 // Route is a routing table entry.
@@ -182,10 +184,10 @@ type OkResponse struct {
 // ConfigResponse is returned by bramble.getConfig.
 // Matches firmware wire format.
 type ConfigResponse struct {
-	NodeName string        `json:"node_name"`
-	Address  string        `json:"address"`
-	Radio    ConfigRadio   `json:"radio"`
-	Channels []Channel     `json:"channels"`
+	NodeName string      `json:"node_name"`
+	Address  string      `json:"address"`
+	Radio    ConfigRadio `json:"radio"`
+	Channels []Channel   `json:"channels"`
 }
 
 // ConfigRadio is the radio section of ConfigResponse.

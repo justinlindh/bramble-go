@@ -144,7 +144,7 @@ type StatusResponse struct {
 }
 
 type Neighbor struct {
-    Address string; RSSI int; SNR float64; LastHeardMs int64
+    Address string; RSSI int; SNR float64; LastSeenAgoMs int64
 }
 
 type SendResult struct {
