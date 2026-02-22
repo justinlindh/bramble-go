@@ -50,7 +50,7 @@ func TestClient_Status(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer c.Close()
 
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"address":"1191C6E0","firmware_version":"0.1.0-dev","protocol_version":"0.1.0","hardware":"heltec_v3","radio_ok":true,"peers":2,"beacon_tx":10,"beacon_rx":20,"packets_tx":10,"packets_rx":20,"uptime_s":3600}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"address":"1191C6E0","firmware_version":"0.2.0-dev","protocol_version":"0.2.0","hardware":"heltec_v3","radio_ok":true,"peers":2,"beacon_tx":10,"beacon_rx":20,"packets_tx":10,"packets_rx":20,"uptime_s":3600}}`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -97,7 +97,7 @@ func TestClient_Neighbors(t *testing.T) {
 func TestClient_Ping(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer c.Close()
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"pong":true,"address":"4A555354","protocol_version":"0.1.0"}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"pong":true,"address":"4A555354","protocol_version":"0.2.0"}}`)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	if err := c.Ping(ctx); err != nil {

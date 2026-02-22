@@ -6,14 +6,14 @@ const (
 	MinProtocolVersion = "0.1.0"
 
 	// MaxProtocolVersion is the maximum protocol version this SDK can speak.
-	MaxProtocolVersion = "0.1.0"
+	MaxProtocolVersion = "0.2.0"
 
 	// SDKVersion is the version of this SDK itself.
 	SDKVersion = "0.2.0"
 )
 
 // IsCompatible reports whether the given firmware protocol version string
-// is compatible with this SDK. Currently only exact 0.1.0 is accepted.
+// is compatible with this SDK.
 func IsCompatible(version string) bool {
-	return version == MinProtocolVersion
+	return version >= MinProtocolVersion && version <= MaxProtocolVersion
 }

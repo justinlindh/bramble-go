@@ -27,7 +27,7 @@ func TestProtocol_Call(t *testing.T) {
 	p, mock := newConnectedProtocol(t)
 	defer p.Stop()
 
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"pong":true,"address":"AABBCCDD","protocol_version":"0.1.0"}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"pong":true,"address":"AABBCCDD","protocol_version":"0.2.0"}}`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
