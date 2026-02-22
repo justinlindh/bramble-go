@@ -12,12 +12,12 @@ import (
 // Client is the high-level Bramble mesh node client.
 // Create one with NewClient, then call Connect before any other methods.
 type Client struct {
-	proto          *Protocol
-	t              transport.Transport
-	mu             sync.Mutex
-	onMessageFn    func(Message)
-	onAckFn        func(Ack)
-	onNeighborFn   func()
+	proto        *Protocol
+	t            transport.Transport
+	mu           sync.Mutex
+	onMessageFn  func(Message)
+	onAckFn      func(Ack)
+	onNeighborFn func()
 }
 
 // NewClient creates a new Client using the given transport.
@@ -163,9 +163,30 @@ func (c *Client) Airtime(ctx context.Context) (*AirtimeStats, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Newer wire format: {"tiers":[...]}
 	var resp AirtimeStats
-	if err := json.Unmarshal(raw, &resp); err != nil {
+	if err := json.Unmarshal(raw, &resp); err == nil && len(resp.Tiers) > 0 {
+		return &resp, nil
+	}
+
+	// Current firmware format: flat fields.
+	var flat struct {
+		CriticalRemainingMs  int   `json:"critical_remaining_ms"`
+		NormalRemainingMs    int   `json:"normal_remaining_ms"`
+		BroadcastRemainingMs int   `json:"broadcast_remaining_ms"`
+		CriticalMaxMs        int   `json:"critical_max_ms"`
+		NormalMaxMs          int   `json:"normal_max_ms"`
+		BroadcastMaxMs       int   `json:"broadcast_max_ms"`
+		NextRefillMs         int64 `json:"next_refill_ms"`
+	}
+	if err := json.Unmarshal(raw, &flat); err != nil {
 		return nil, fmt.Errorf("bramble: decode AirtimeStats: %w", err)
+	}
+	resp.Tiers = []AirtimeTier{
+		{Name: "critical", RemainingMs: flat.CriticalRemainingMs, MaxMs: flat.CriticalMaxMs, RefillAtMs: flat.NextRefillMs},
+		{Name: "normal", RemainingMs: flat.NormalRemainingMs, MaxMs: flat.NormalMaxMs, RefillAtMs: flat.NextRefillMs},
+		{Name: "broadcast", RemainingMs: flat.BroadcastRemainingMs, MaxMs: flat.BroadcastMaxMs, RefillAtMs: flat.NextRefillMs},
 	}
 	return &resp, nil
 }
@@ -209,11 +230,15 @@ func (c *Client) PeerLocations(ctx context.Context) ([]LocationPeer, error) {
 	}
 	var resp struct {
 		PeerLocations []LocationPeer `json:"peerLocations"`
+		Peers         []LocationPeer `json:"peers"`
 	}
 	if err := json.Unmarshal(raw, &resp); err != nil {
 		return nil, fmt.Errorf("bramble: decode PeerLocationsResponse: %w", err)
 	}
-	return resp.PeerLocations, nil
+	if len(resp.PeerLocations) > 0 {
+		return resp.PeerLocations, nil
+	}
+	return resp.Peers, nil
 }
 
 // ── Action / Config Methods ───────────────────────────────────────────────────
@@ -229,6 +254,9 @@ func (c *Client) Send(ctx context.Context, dest uint32, text string) (*SendResul
 	var resp SendResult
 	if err := json.Unmarshal(raw, &resp); err != nil {
 		return nil, fmt.Errorf("bramble: decode SendResult: %w", err)
+	}
+	if resp.MessageID == "" && resp.PacketID != "" {
+		resp.MessageID = resp.PacketID
 	}
 	return &resp, nil
 }
@@ -257,12 +285,34 @@ func (c *Client) SendProbe(ctx context.Context) (*SendProbeResult, error) {
 	if err := json.Unmarshal(raw, &resp); err != nil {
 		return nil, fmt.Errorf("bramble: decode SendProbeResult: %w", err)
 	}
+	if resp.ProbeID == 0 && resp.ProbeIDHex != "" {
+		if v, perr := fmt.Sscanf(resp.ProbeIDHex, "%x", &resp.ProbeID); perr != nil || v != 1 {
+			// keep hex-only when parse fails
+		}
+	}
 	return &resp, nil
 }
 
 // SetRadio updates radio parameters. Only non-nil fields in config are sent.
 func (c *Client) SetRadio(ctx context.Context, config RadioConfig) error {
-	raw, err := c.proto.Call(ctx, "bramble.setRadio", config)
+	params := map[string]any{}
+	if config.TxPowerDbm != nil {
+		params["tx_power_dbm"] = *config.TxPowerDbm
+	}
+	if config.SF != nil {
+		params["sf"] = *config.SF
+	}
+	if config.BwKhz != nil {
+		params["bw_hz"] = *config.BwKhz * 1000
+	}
+	if config.CR != nil {
+		params["coding_rate"] = *config.CR
+	}
+	if config.FreqMhz != nil {
+		params["frequency_mhz"] = *config.FreqMhz
+	}
+
+	raw, err := c.proto.Call(ctx, "bramble.setRadio", params)
 	if err != nil {
 		return err
 	}
@@ -331,8 +381,8 @@ func (c *Client) SetLocationConfig(ctx context.Context, config LocationConfig) e
 // SetLocationContact adds or updates a location sharing contact.
 func (c *Client) SetLocationContact(ctx context.Context, addr uint32, tier string) error {
 	raw, err := c.proto.Call(ctx, "bramble.setLocationContact", map[string]any{
-		"addr": addr,
-		"tier": tier,
+		"address": fmt.Sprintf("%08X", addr),
+		"tier":    tier,
 	})
 	if err != nil {
 		return err
@@ -342,7 +392,7 @@ func (c *Client) SetLocationContact(ctx context.Context, addr uint32, tier strin
 
 // RemoveLocationContact stops sharing location with the specified peer.
 func (c *Client) RemoveLocationContact(ctx context.Context, addr uint32) error {
-	raw, err := c.proto.Call(ctx, "bramble.removeLocationContact", map[string]any{"addr": addr})
+	raw, err := c.proto.Call(ctx, "bramble.removeLocationContact", map[string]any{"address": fmt.Sprintf("%08X", addr)})
 	if err != nil {
 		return err
 	}
@@ -351,7 +401,7 @@ func (c *Client) RemoveLocationContact(ctx context.Context, addr uint32) error {
 
 // ShareLocationOnce sends a one-time location update to the specified peer.
 func (c *Client) ShareLocationOnce(ctx context.Context, addr uint32) error {
-	raw, err := c.proto.Call(ctx, "bramble.shareLocationOnce", map[string]any{"addr": addr})
+	raw, err := c.proto.Call(ctx, "bramble.shareLocationOnce", map[string]any{"address": fmt.Sprintf("%08X", addr)})
 	if err != nil {
 		return err
 	}

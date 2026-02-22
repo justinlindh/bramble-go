@@ -68,6 +68,7 @@ type Route struct {
 	Metric     int    `json:"metric"`
 	State      string `json:"state"`
 	LastUsedMs int64  `json:"last_used_ms"`
+	UseCount   int    `json:"use_count,omitempty"`
 }
 
 // Channel is a configured channel.
@@ -161,14 +162,17 @@ type LocationUpdate struct {
 
 // SendResult is returned by bramble.sendMessage / bramble.sendBroadcast.
 type SendResult struct {
-	MessageID string `json:"message_id"`
+	MessageID string `json:"message_id,omitempty"`
+	PacketID  string `json:"packetId,omitempty"`
 	Status    string `json:"status"`
 }
 
 // SendProbeResult is returned by bramble.sendProbe.
 type SendProbeResult struct {
-	ProbeID   int `json:"probeId"`
-	AckWindow int `json:"ackWindow"`
+	ProbeID    int    `json:"probeId,omitempty"`
+	ProbeIDHex string `json:"probe_id,omitempty"`
+	AckWindow  int    `json:"ackWindow,omitempty"`
+	OK         bool   `json:"ok,omitempty"`
 }
 
 // AddChannelResult is returned by bramble.addChannel.

@@ -106,7 +106,10 @@ func (p *Protocol) reader() {
 			continue
 		}
 
-		if msg.ID != nil {
+		isResponse := msg.ID != nil && msg.Method == "" // result or error reply
+		isNotification := msg.Method != "" && msg.ID == nil // server-pushed event
+
+		if isResponse {
 			// Response to a pending Call.
 			if ch, ok := p.pending.Load(*msg.ID); ok {
 				resp := msg
@@ -115,7 +118,7 @@ func (p *Protocol) reader() {
 			continue
 		}
 
-		if msg.Method != "" {
+		if isNotification {
 			// Unsolicited notification.
 			n := Notification{Method: msg.Method, Params: msg.Params}
 			select {
@@ -124,6 +127,8 @@ func (p *Protocol) reader() {
 				// Drop if consumer is slow.
 			}
 		}
+		// Otherwise: message has both ID and Method — this is the serial echo of our
+		// own request reflecting back from the device's console. Discard silently.
 	}
 }
 
