@@ -220,3 +220,58 @@ type LocationConfig struct {
 	DefaultDistanceTriggerM *int  `json:"defaultDistanceTriggerM,omitempty"`
 	StationaryBackoff       *int  `json:"stationaryBackoff,omitempty"`
 }
+
+// ── Traffic Debug Types ──────────────────────────────────────────────────────
+
+// SetTrafficDebugParams contains parameters for bramble.setTrafficDebug.
+type SetTrafficDebugParams struct {
+	Enabled    *bool `json:"enabled,omitempty"`
+	IncludeTx  *bool `json:"include_tx,omitempty"`
+	IncludeRx  *bool `json:"include_rx,omitempty"`
+	SampleRate *int  `json:"sample_rate,omitempty"` // 0-100
+}
+
+// SetTrafficDebugResponse is returned by bramble.setTrafficDebug.
+type SetTrafficDebugResponse struct {
+	OK         bool `json:"ok"`
+	Enabled    bool `json:"enabled"`
+	IncludeTx  bool `json:"include_tx"`
+	IncludeRx  bool `json:"include_rx"`
+	SampleRate int  `json:"sample_rate"`
+}
+
+// GetTrafficDebugResponse is returned by bramble.getTrafficDebug.
+type GetTrafficDebugResponse struct {
+	Enabled        bool `json:"enabled"`
+	IncludeTx      bool `json:"include_tx"`
+	IncludeRx      bool `json:"include_rx"`
+	SampleRate     int  `json:"sample_rate"`
+	BufferCapacity int  `json:"buffer_capacity"`
+	BufferCount    int  `json:"buffer_count"`
+	DroppedCount   int  `json:"dropped_count"`
+}
+
+// GetTrafficEventsParams contains parameters for bramble.getTrafficEvents.
+type GetTrafficEventsParams struct {
+	SinceSeq *uint32 `json:"since_seq,omitempty"`
+	Limit    *int    `json:"limit,omitempty"` // 1-512, default 100
+}
+
+// GetTrafficEventsResponse is returned by bramble.getTrafficEvents.
+type GetTrafficEventsResponse struct {
+	Events         []TrafficEvent `json:"events"`
+	Returned       int            `json:"returned"`
+	TotalAvailable int            `json:"total_available"`
+}
+
+// TrafficEvent represents a single TX or RX packet event for telemetry.
+type TrafficEvent struct {
+	Seq         uint32 `json:"seq"`
+	TimestampMs uint32 `json:"timestamp_ms"`
+	PktType     int    `json:"pkt_type"`
+	Category    string `json:"category"`     // beacon, timesync, routing, ack, chat, maintenance, other, unknown
+	AirtimeTier string `json:"airtime_tier"` // none, normal, critical, broadcast, unknown
+	PacketLen   int    `json:"packet_len"`
+	RSSI        int    `json:"rssi"` // 0 for TX events
+	IsTx        bool   `json:"is_tx"`
+}

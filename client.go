@@ -12,12 +12,13 @@ import (
 // Client is the high-level Bramble mesh node client.
 // Create one with NewClient, then call Connect before any other methods.
 type Client struct {
-	proto        *Protocol
-	t            transport.Transport
-	mu           sync.Mutex
-	onMessageFn  func(Message)
-	onAckFn      func(Ack)
-	onNeighborFn func()
+	proto            *Protocol
+	t                transport.Transport
+	mu               sync.Mutex
+	onMessageFn      func(Message)
+	onAckFn          func(Ack)
+	onNeighborFn     func()
+	onTrafficEventFn func(TrafficEvent)
 }
 
 // NewClient creates a new Client using the given transport.
@@ -61,6 +62,7 @@ func (c *Client) notifyLoop() {
 		onMsg := c.onMessageFn
 		onAck := c.onAckFn
 		onNeighbor := c.onNeighborFn
+		onTraffic := c.onTrafficEventFn
 		c.mu.Unlock()
 
 		switch n.Method {
@@ -81,6 +83,13 @@ func (c *Client) notifyLoop() {
 		case "bramble.onNeighborChange":
 			if onNeighbor != nil {
 				onNeighbor()
+			}
+		case "bramble.onTrafficEvent":
+			if onTraffic != nil {
+				var evt TrafficEvent
+				if json.Unmarshal(n.Params, &evt) == nil {
+					onTraffic(evt)
+				}
 			}
 		}
 	}
@@ -430,6 +439,49 @@ func (c *Client) Config(ctx context.Context) (*ConfigResponse, error) {
 	return &resp, nil
 }
 
+// ── Traffic Debug ─────────────────────────────────────────────────────────────
+
+// SetTrafficDebug configures traffic debug telemetry recording.
+// Settings are persisted to NVS and survive reboots.
+func (c *Client) SetTrafficDebug(ctx context.Context, params SetTrafficDebugParams) (*SetTrafficDebugResponse, error) {
+	raw, err := c.proto.Call(ctx, "bramble.setTrafficDebug", params)
+	if err != nil {
+		return nil, err
+	}
+	var resp SetTrafficDebugResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode SetTrafficDebugResponse: %w", err)
+	}
+	return &resp, nil
+}
+
+// GetTrafficDebug returns the current traffic debug configuration and buffer state.
+func (c *Client) GetTrafficDebug(ctx context.Context) (*GetTrafficDebugResponse, error) {
+	raw, err := c.proto.Call(ctx, "bramble.getTrafficDebug", nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp GetTrafficDebugResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode GetTrafficDebugResponse: %w", err)
+	}
+	return &resp, nil
+}
+
+// GetTrafficEvents retrieves traffic events from the ring buffer.
+// Use params.SinceSeq to request only new events (incremental pull).
+func (c *Client) GetTrafficEvents(ctx context.Context, params GetTrafficEventsParams) (*GetTrafficEventsResponse, error) {
+	raw, err := c.proto.Call(ctx, "bramble.getTrafficEvents", params)
+	if err != nil {
+		return nil, err
+	}
+	var resp GetTrafficEventsResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode GetTrafficEventsResponse: %w", err)
+	}
+	return &resp, nil
+}
+
 // ── Notification Callbacks ────────────────────────────────────────────────────
 
 // OnMessage registers a callback invoked when a bramble.onMessage notification arrives.
@@ -450,6 +502,14 @@ func (c *Client) OnAck(fn func(Ack)) {
 func (c *Client) OnNeighborChange(fn func()) {
 	c.mu.Lock()
 	c.onNeighborFn = fn
+	c.mu.Unlock()
+}
+
+// OnTrafficEvent registers a callback invoked when a bramble.onTrafficEvent notification arrives.
+// Used for real-time traffic debug event monitoring.
+func (c *Client) OnTrafficEvent(fn func(TrafficEvent)) {
+	c.mu.Lock()
+	c.onTrafficEventFn = fn
 	c.mu.Unlock()
 }
 
