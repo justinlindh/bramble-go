@@ -11,6 +11,11 @@ import (
 	"go.bug.st/serial"
 )
 
+var (
+	serialOpenFunc = serial.Open
+	serialSleep    = time.Sleep
+)
+
 const defaultBaudRate = 115200
 
 // SerialOption is a functional option for configuring a Serial transport.
@@ -79,7 +84,7 @@ func (s *Serial) Connect(_ context.Context) error {
 		StopBits: serial.OneStopBit,
 	}
 
-	conn, err := serial.Open(s.port, mode)
+	conn, err := serialOpenFunc(s.port, mode)
 	if err != nil {
 		return fmt.Errorf("bramble/transport/serial: open %s: %w", s.port, err)
 	}
@@ -186,9 +191,9 @@ func (s *Serial) reconnect() error {
 		default:
 		}
 
-		time.Sleep(delay)
+		serialSleep(delay)
 
-		conn, err := serial.Open(s.port, mode)
+		conn, err := serialOpenFunc(s.port, mode)
 		if err == nil {
 			s.mu.Lock()
 			s.conn = conn
