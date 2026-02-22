@@ -9,6 +9,11 @@ import (
 	"nhooyr.io/websocket"
 )
 
+var (
+	websocketDialFunc = websocket.Dial
+	websocketSleep    = time.Sleep
+)
+
 // WebSocket is a Transport that communicates with a Bramble node over a WebSocket connection.
 // Each WebSocket message frame carries exactly one JSON-RPC message; no newline framing is used.
 //
@@ -46,7 +51,7 @@ func (w *WebSocket) Connect(ctx context.Context) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	conn, _, err := websocket.Dial(ctx, w.url, nil)
+	conn, _, err := websocketDialFunc(ctx, w.url, nil)
 	if err != nil {
 		return fmt.Errorf("bramble/transport/websocket: dial %s: %w", w.url, err)
 	}
@@ -141,10 +146,10 @@ func (w *WebSocket) reconnect() error {
 		default:
 		}
 
-		time.Sleep(delay)
+		websocketSleep(delay)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		conn, _, err := websocket.Dial(ctx, w.url, nil)
+		conn, _, err := websocketDialFunc(ctx, w.url, nil)
 		cancel()
 
 		if err == nil {
