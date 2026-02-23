@@ -12,13 +12,14 @@ import (
 // Client is the high-level Bramble mesh node client.
 // Create one with NewClient, then call Connect before any other methods.
 type Client struct {
-	proto            *Protocol
-	t                transport.Transport
-	mu               sync.Mutex
-	onMessageFn      func(Message)
-	onAckFn          func(Ack)
-	onNeighborFn     func()
-	onTrafficEventFn func(TrafficEvent)
+	proto                 *Protocol
+	t                     transport.Transport
+	mu                    sync.Mutex
+	onMessageFn           func(Message)
+	onAckFn               func(Ack)
+	onNeighborFn          func()
+	onTrafficEventFn      func(TrafficEvent)
+	onBroadcastDeliveryFn func(BroadcastDelivery)
 }
 
 // NewClient creates a new Client using the given transport.
@@ -63,6 +64,7 @@ func (c *Client) notifyLoop() {
 		onAck := c.onAckFn
 		onNeighbor := c.onNeighborFn
 		onTraffic := c.onTrafficEventFn
+		onBroadcastDelivery := c.onBroadcastDeliveryFn
 		c.mu.Unlock()
 
 		switch n.Method {
@@ -89,6 +91,13 @@ func (c *Client) notifyLoop() {
 				var evt TrafficEvent
 				if json.Unmarshal(n.Params, &evt) == nil {
 					onTraffic(evt)
+				}
+			}
+		case "bramble.onBroadcastDelivery":
+			if onBroadcastDelivery != nil {
+				var evt BroadcastDelivery
+				if json.Unmarshal(n.Params, &evt) == nil {
+					onBroadcastDelivery(evt)
 				}
 			}
 		}
@@ -270,8 +279,8 @@ func (c *Client) Send(ctx context.Context, dest uint32, text string) (*SendResul
 	return &resp, nil
 }
 
-// Broadcast sends a text message to all peers on the public channel.
-func (c *Client) Broadcast(ctx context.Context, text string) (*SendResult, error) {
+// SendBroadcast sends a text message to all peers on the public channel.
+func (c *Client) SendBroadcast(ctx context.Context, text string) (*SendResult, error) {
 	params := map[string]any{"text": text}
 	raw, err := c.proto.Call(ctx, "bramble.sendBroadcast", params)
 	if err != nil {
@@ -281,7 +290,16 @@ func (c *Client) Broadcast(ctx context.Context, text string) (*SendResult, error
 	if err := json.Unmarshal(raw, &resp); err != nil {
 		return nil, fmt.Errorf("bramble: decode SendResult: %w", err)
 	}
+	if resp.BroadcastID == "" && resp.MessageID != "" {
+		resp.BroadcastID = resp.MessageID
+	}
 	return &resp, nil
+}
+
+// Broadcast sends a text message to all peers on the public channel.
+// Deprecated: prefer SendBroadcast.
+func (c *Client) Broadcast(ctx context.Context, text string) (*SendResult, error) {
+	return c.SendBroadcast(ctx, text)
 }
 
 // BroadcastOnChannel sends a mesh-wide message on the specified channel index.
@@ -532,6 +550,13 @@ func (c *Client) OnNeighborChange(fn func()) {
 func (c *Client) OnTrafficEvent(fn func(TrafficEvent)) {
 	c.mu.Lock()
 	c.onTrafficEventFn = fn
+	c.mu.Unlock()
+}
+
+// OnBroadcastDelivery registers a callback invoked when a bramble.onBroadcastDelivery notification arrives.
+func (c *Client) OnBroadcastDelivery(fn func(BroadcastDelivery)) {
+	c.mu.Lock()
+	c.onBroadcastDeliveryFn = fn
 	c.mu.Unlock()
 }
 
