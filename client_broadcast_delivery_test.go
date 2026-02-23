@@ -1,0 +1,78 @@
+package bramble
+
+import (
+	"context"
+	"testing"
+	"time"
+)
+
+func TestClient_SendBroadcast_ReturnsBroadcastID(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"broadcast_id":"BCAST-001","status":"queued"}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	result, err := c.SendBroadcast(ctx, "hello everyone")
+	if err != nil {
+		t.Fatalf("SendBroadcast error: %v", err)
+	}
+	if result.BroadcastID != "BCAST-001" {
+		t.Fatalf("BroadcastID: got %q, want BCAST-001", result.BroadcastID)
+	}
+}
+
+func TestClient_OnBroadcastDelivery_TypedPayload(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	received := make(chan BroadcastDelivery, 1)
+	c.OnBroadcastDelivery(func(evt BroadcastDelivery) { received <- evt })
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onBroadcastDelivery","params":{"broadcast_id":"BCAST-123","recipient":"A1B2C3D4","status":"delivered","timestamp_ms":1730000000123}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	select {
+	case evt := <-received:
+		if evt.BroadcastID != "BCAST-123" {
+			t.Fatalf("broadcast_id: got %q, want BCAST-123", evt.BroadcastID)
+		}
+		if evt.Recipient != "A1B2C3D4" {
+			t.Fatalf("recipient: got %q, want A1B2C3D4", evt.Recipient)
+		}
+		if evt.Status != "delivered" {
+			t.Fatalf("status: got %q, want delivered", evt.Status)
+		}
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for OnBroadcastDelivery callback")
+	}
+}
+
+func TestClient_OnBroadcastDelivery_UnknownFieldTolerance(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	received := make(chan BroadcastDelivery, 1)
+	c.OnBroadcastDelivery(func(evt BroadcastDelivery) { received <- evt })
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onBroadcastDelivery","params":{"broadcast_id":"BCAST-999","recipient":"FFFFFFFF","status":"failed","timestamp_ms":1730000000999,"unknown_field":"ignored","nested":{"extra":true}}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	select {
+	case evt := <-received:
+		if evt.BroadcastID != "BCAST-999" {
+			t.Fatalf("broadcast_id: got %q, want BCAST-999", evt.BroadcastID)
+		}
+		if evt.Status != "failed" {
+			t.Fatalf("status: got %q, want failed", evt.Status)
+		}
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for OnBroadcastDelivery callback with unknown fields")
+	}
+}

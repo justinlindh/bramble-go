@@ -136,6 +136,14 @@ type Ack struct {
 	RelayPath []RelayHop `json:"relayPath,omitempty"`
 }
 
+// BroadcastDelivery is the telemetry payload for bramble.onBroadcastDelivery.
+type BroadcastDelivery struct {
+	BroadcastID string `json:"broadcast_id"`
+	Recipient   string `json:"recipient"`
+	Status      string `json:"status"`
+	TimestampMs int64  `json:"timestamp_ms,omitempty"`
+}
+
 // ProbeResult is delivered via bramble.onProbeResult / probe.ack notifications.
 type ProbeResult struct {
 	ResponderAddr string   `json:"responderAddr"`
@@ -164,9 +172,10 @@ type LocationUpdate struct {
 
 // SendResult is returned by bramble.sendMessage / bramble.sendBroadcast.
 type SendResult struct {
-	MessageID string `json:"message_id,omitempty"`
-	PacketID  string `json:"packetId,omitempty"`
-	Status    string `json:"status"`
+	MessageID   string `json:"message_id,omitempty"`
+	PacketID    string `json:"packetId,omitempty"`
+	BroadcastID string `json:"broadcast_id,omitempty"`
+	Status      string `json:"status"`
 }
 
 // SendProbeResult is returned by bramble.sendProbe.

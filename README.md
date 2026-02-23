@@ -1,6 +1,6 @@
 # bramble-go
 
-Go SDK for [Bramble](https://github.com/justinlindh/bramble) LoRa mesh nodes. Communicates via JSON-RPC 2.0 over Serial, WebSocket, or BLE.
+Go SDK for [Bramble](https://github.com/justinlindh/bramble) LoRa mesh nodes. Communicates via JSON-RPC 2.0 over Serial, WebSocket, or BLE (Nordic UART Service).
 
 ## Install
 
@@ -29,7 +29,7 @@ import (
 )
 
 func main() {
-    t := transport.NewWebSocket("ws://192.168.4.1/rpc")
+    t := transport.NewWebSocket("ws://192.168.4.1/ws")
     client := bramble.NewClient(t)
 
     ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -65,20 +65,58 @@ See [`examples/`](examples/) for more.
 | Transport | Status | Constructor |
 |-----------|--------|-------------|
 | Serial (UART) | ✅ Ready | `transport.NewSerial("/dev/ttyUSB0")` |
-| WebSocket | ✅ Ready | `transport.NewWebSocket("ws://192.168.4.1/rpc")` |
-| BLE | 🔲 Stub | `transport.NewBLE()` (returns not-implemented) |
+| WebSocket | ✅ Ready | `transport.NewWebSocket("ws://192.168.4.1/ws")` |
+| BLE (NUS) | ✅ Ready | `transport.NewBLE(transport.BLEConfig{...})` |
 
 ### WebSocket Auto-Reconnect
 
 The WebSocket transport automatically reconnects on unexpected disconnects using exponential backoff (1s → 2s → 4s → … → 30s max). Set callbacks to be notified:
 
 ```go
-ws := transport.NewWebSocket("ws://192.168.4.1/rpc")
+ws := transport.NewWebSocket("ws://192.168.4.1/ws")
 ws.OnDisconnect = func() { log.Println("disconnected") }
 ws.OnReconnect = func() { log.Println("reconnected!") }
 ```
 
 During reconnection, `Send()` returns `transport.ErrReconnecting`.
+
+### BLE Transport (Nordic UART Service)
+
+BLE support is implemented via NUS (Nordic UART Service), using newline-delimited JSON-RPC over BLE notifications/writes.
+
+Constructor and config:
+
+```go
+ble := transport.NewBLE(transport.BLEConfig{
+    DeviceName:  "Bramble",        // optional; empty means auto-scan for first matching NUS device
+    ScanTimeout: 15 * time.Second,  // optional; default is 10s
+})
+client := bramble.NewClient(ble)
+```
+
+Practical notes:
+
+- **Platform support depends on your host BLE stack** (`tinygo.org/x/bluetooth` backend).
+- On Linux, ensure Bluetooth is enabled and your user has permissions to access BLE (commonly via BlueZ/dbus setup).
+- If `DeviceName` is set, scan matching is case-insensitive substring matching.
+- If `DeviceName` is empty, transport scans for the first device advertising the Bramble NUS service.
+- Pairing/bonding behavior is OS-level; complete pairing first if your platform requires it.
+- BLE throughput/latency is lower than Wi-Fi serial/WebSocket; keep RPC deadlines realistic.
+
+Minimal BLE connect example:
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+defer cancel()
+
+ble := transport.NewBLE(transport.BLEConfig{DeviceName: "Bramble"})
+client := bramble.NewClient(ble)
+
+if err := client.Connect(ctx); err != nil {
+    log.Fatalf("BLE connect failed: %v", err)
+}
+defer client.Close()
+```
 
 ## API Reference
 
@@ -158,8 +196,8 @@ type ConfigResponse struct {
 
 ## Protocol Compatibility
 
-This SDK negotiates protocol versions on connect. See [VERSIONING.md](https://github.com/justinlindh/bramble/src/branch/feature/rpc-sdk-cli/VERSIONING.md) for the compatibility matrix.
+This SDK negotiates protocol versions on connect. See [VERSIONING.md](https://github.com/justinlindh/bramble/src/branch/feature/ws-sdk-cli/VERSIONING.md) for the compatibility matrix.
 
 ## License
 
-TBD — see [VERSIONING.md](https://github.com/justinlindh/bramble/src/branch/feature/rpc-sdk-cli/VERSIONING.md)
+TBD — see [VERSIONING.md](https://github.com/justinlindh/bramble/src/branch/feature/ws-sdk-cli/VERSIONING.md)

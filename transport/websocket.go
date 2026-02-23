@@ -38,7 +38,7 @@ type WebSocket struct {
 }
 
 // NewWebSocket creates a new WebSocket transport for the given URL.
-// The URL should use the ws:// or wss:// scheme (e.g. "ws://192.168.4.1/rpc").
+// The URL should use the ws:// or wss:// scheme (e.g. "ws://192.168.4.1/ws").
 func NewWebSocket(url string) *WebSocket {
 	return &WebSocket{
 		url:  url,
