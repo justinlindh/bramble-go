@@ -13,7 +13,7 @@ import (
 
 func main() {
 	// Connect via WebSocket (e.g. ESP32 in AP mode).
-	t := transport.NewWebSocket("ws://192.168.4.1/rpc")
+	t := transport.NewWebSocket("ws://192.168.4.1/ws")
 	client := bramble.NewClient(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	t := transport.NewWebSocket("ws://192.168.4.1/rpc")
+	t := transport.NewWebSocket("ws://192.168.4.1/ws")
 	client := bramble.NewClient(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
