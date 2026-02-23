@@ -75,6 +75,8 @@ type Route struct {
 type Channel struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
+	HasPsk    bool   `json:"hasPsk,omitempty"`
+	Epoch     int    `json:"epoch,omitempty"`
 	IsDefault bool   `json:"is_default"`
 }
 

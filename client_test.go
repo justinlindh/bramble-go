@@ -208,7 +208,7 @@ func TestClient_Config(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer c.Close()
 
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"node_name":"mynode","address":"1191C6E0","radio":{"frequency_mhz":915,"sf":9,"bw_hz":125000,"tx_power_dbm":17,"profile":"long_range"},"channels":[{"id":0,"name":"public","is_default":true}]}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"node_name":"mynode","address":"1191C6E0","radio":{"frequency_mhz":915,"sf":9,"bw_hz":125000,"tx_power_dbm":17,"profile":"long_range"},"channels":[{"id":0,"name":"public","hasPsk":false,"epoch":0,"is_default":true},{"id":1,"name":"team","hasPsk":true,"epoch":7,"is_default":false}]}}`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -222,6 +222,15 @@ func TestClient_Config(t *testing.T) {
 	}
 	if cfg.Radio.FrequencyMhz != 915 {
 		t.Errorf("frequency_mhz: got %d, want 915", cfg.Radio.FrequencyMhz)
+	}
+	if len(cfg.Channels) != 2 {
+		t.Fatalf("channels len: got %d, want 2", len(cfg.Channels))
+	}
+	if !cfg.Channels[1].HasPsk {
+		t.Fatalf("expected channel[1].HasPsk=true")
+	}
+	if cfg.Channels[1].Epoch != 7 {
+		t.Fatalf("channel[1].Epoch: got %d, want 7", cfg.Channels[1].Epoch)
 	}
 }
 
