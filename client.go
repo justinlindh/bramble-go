@@ -284,6 +284,28 @@ func (c *Client) Broadcast(ctx context.Context, text string) (*SendResult, error
 	return &resp, nil
 }
 
+// BroadcastOnChannel sends a mesh-wide message on the specified channel index.
+// This uses bramble.sendMessage with dest=0xFFFFFFFE (channel broadcast alias).
+func (c *Client) BroadcastOnChannel(ctx context.Context, channel int, text string) (*SendResult, error) {
+	params := map[string]any{
+		"dest":    "FFFFFFFE",
+		"text":    text,
+		"channel": channel,
+	}
+	raw, err := c.proto.Call(ctx, "bramble.sendMessage", params)
+	if err != nil {
+		return nil, err
+	}
+	var resp SendResult
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode SendResult: %w", err)
+	}
+	if resp.MessageID == "" && resp.PacketID != "" {
+		resp.MessageID = resp.PacketID
+	}
+	return &resp, nil
+}
+
 // SendProbe broadcasts a probe packet. Results arrive as notifications.
 func (c *Client) SendProbe(ctx context.Context) (*SendProbeResult, error) {
 	raw, err := c.proto.Call(ctx, "bramble.sendProbe", nil)

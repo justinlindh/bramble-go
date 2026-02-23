@@ -2,6 +2,7 @@ package bramble
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -138,6 +139,35 @@ func TestClient_Broadcast(t *testing.T) {
 	}
 	if result.Status != "sent" {
 		t.Errorf("status: got %q, want sent", result.Status)
+	}
+}
+
+func TestClient_BroadcastOnChannel(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"packetId":"A1B2C3D4","status":"sent"}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	result, err := c.BroadcastOnChannel(ctx, 2, "hello ch2")
+	if err != nil {
+		t.Fatalf("BroadcastOnChannel error: %v", err)
+	}
+	if result.Status != "sent" {
+		t.Errorf("status: got %q, want sent", result.Status)
+	}
+
+	sent := mock.Sent()
+	if len(sent) != 1 {
+		t.Fatalf("expected 1 sent request, got %d", len(sent))
+	}
+	if !strings.Contains(sent[0], `"method":"bramble.sendMessage"`) {
+		t.Fatalf("expected bramble.sendMessage request, got: %s", sent[0])
+	}
+	if !strings.Contains(sent[0], `"dest":"FFFFFFFE"`) || !strings.Contains(sent[0], `"channel":2`) {
+		t.Fatalf("expected channel broadcast params in request, got: %s", sent[0])
 	}
 }
 
