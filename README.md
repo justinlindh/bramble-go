@@ -198,6 +198,29 @@ type ConfigResponse struct {
 
 This SDK negotiates protocol versions on connect. See [VERSIONING.md](https://github.com/justinlindh/bramble/src/branch/feature/ws-sdk-cli/VERSIONING.md) for the compatibility matrix.
 
+## Releases (semantic-release)
+
+Releases are automated from `main` using semantic-release and Conventional Commits.
+
+### Required Gitea Actions secrets
+
+- `GITEA_TOKEN` (**required**): Personal Access Token with repository write/release permissions.
+- `GITEA_URL` (optional): Base URL of the Gitea instance. Defaults to `https://github.com`.
+
+### Commit format
+
+Use Conventional Commits so semantic-release can determine the next version:
+
+- `feat:` → minor release (`vX.Y.0`)
+- `fix:` → patch release (`vX.Y.Z`)
+- `feat!:` or footer `BREAKING CHANGE:` → major release (`vX.0.0`)
+
+Examples:
+
+- `feat(client): add message retry policy`
+- `fix(ws): handle reconnect race`
+- `feat(api)!: rename Status field`
+
 ## License
 
 TBD — see [VERSIONING.md](https://github.com/justinlindh/bramble/src/branch/feature/ws-sdk-cli/VERSIONING.md)

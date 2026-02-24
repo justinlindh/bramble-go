@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  semantic-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install semantic-release dependencies
+        run: |
+          npm install --no-save \
+            semantic-release@24 \
+            @semantic-release/commit-analyzer@13 \
+            @semantic-release/release-notes-generator@14 \
+            @saithodev/semantic-release-gitea@2
+
+      - name: Run semantic-release
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITEA_URL: ${{ secrets.GITEA_URL }}
+        run: npx semantic-release
