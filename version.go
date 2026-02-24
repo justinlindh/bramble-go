@@ -6,10 +6,10 @@ const (
 	MinProtocolVersion = "0.1.0"
 
 	// MaxProtocolVersion is the maximum protocol version this SDK can speak.
-	MaxProtocolVersion = "0.3.0"
+	MaxProtocolVersion = "0.4.0"
 
 	// SDKVersion is the version of this SDK itself.
-	SDKVersion = "0.3.0"
+	SDKVersion = "0.4.0"
 )
 
 // IsCompatible reports whether the given firmware protocol version string
