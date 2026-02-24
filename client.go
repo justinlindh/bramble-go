@@ -20,6 +20,9 @@ type Client struct {
 	onNeighborFn          func()
 	onTrafficEventFn      func(TrafficEvent)
 	onBroadcastDeliveryFn func(BroadcastDelivery)
+	onWifiEventFn         func(WifiEvent)
+	onGpsEventFn          func(GpsEvent)
+	onLocationEventFn     func(LocationEvent)
 }
 
 // NewClient creates a new Client using the given transport.
@@ -65,6 +68,9 @@ func (c *Client) notifyLoop() {
 		onNeighbor := c.onNeighborFn
 		onTraffic := c.onTrafficEventFn
 		onBroadcastDelivery := c.onBroadcastDeliveryFn
+		onWifi := c.onWifiEventFn
+		onGps := c.onGpsEventFn
+		onLocation := c.onLocationEventFn
 		c.mu.Unlock()
 
 		switch n.Method {
@@ -98,6 +104,27 @@ func (c *Client) notifyLoop() {
 				var evt BroadcastDelivery
 				if json.Unmarshal(n.Params, &evt) == nil {
 					onBroadcastDelivery(evt)
+				}
+			}
+		case "bramble.onWifiEvent":
+			if onWifi != nil {
+				var evt WifiEvent
+				if json.Unmarshal(n.Params, &evt) == nil {
+					onWifi(evt)
+				}
+			}
+		case "bramble.onGpsEvent":
+			if onGps != nil {
+				var evt GpsEvent
+				if json.Unmarshal(n.Params, &evt) == nil {
+					onGps(evt)
+				}
+			}
+		case "bramble.onLocationEvent":
+			if onLocation != nil {
+				var evt LocationEvent
+				if json.Unmarshal(n.Params, &evt) == nil {
+					onLocation(evt)
 				}
 			}
 		}
@@ -553,6 +580,27 @@ func (c *Client) OnTrafficEvent(fn func(TrafficEvent)) {
 func (c *Client) OnBroadcastDelivery(fn func(BroadcastDelivery)) {
 	c.mu.Lock()
 	c.onBroadcastDeliveryFn = fn
+	c.mu.Unlock()
+}
+
+// OnWifiEvent registers a callback invoked when a bramble.onWifiEvent notification arrives.
+func (c *Client) OnWifiEvent(fn func(WifiEvent)) {
+	c.mu.Lock()
+	c.onWifiEventFn = fn
+	c.mu.Unlock()
+}
+
+// OnGpsEvent registers a callback invoked when a bramble.onGpsEvent notification arrives.
+func (c *Client) OnGpsEvent(fn func(GpsEvent)) {
+	c.mu.Lock()
+	c.onGpsEventFn = fn
+	c.mu.Unlock()
+}
+
+// OnLocationEvent registers a callback invoked when a bramble.onLocationEvent notification arrives.
+func (c *Client) OnLocationEvent(fn func(LocationEvent)) {
+	c.mu.Lock()
+	c.onLocationEventFn = fn
 	c.mu.Unlock()
 }
 

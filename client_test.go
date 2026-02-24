@@ -234,6 +234,60 @@ func TestClient_OnNeighborChange(t *testing.T) {
 	}
 }
 
+func TestClient_OnWifiEvent(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	received := make(chan WifiEvent, 1)
+	c.OnWifiEvent(func(e WifiEvent) { received <- e })
+	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onWifiEvent","params":{"event":"connected","mode":"sta","connected":true,"ip":"192.0.2.0"}}`)
+
+	select {
+	case evt := <-received:
+		if evt.Event != "connected" || evt.IP != "192.0.2.0" {
+			t.Fatalf("unexpected wifi event: %+v", evt)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for OnWifiEvent callback")
+	}
+}
+
+func TestClient_OnGpsEvent(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	received := make(chan GpsEvent, 1)
+	c.OnGpsEvent(func(e GpsEvent) { received <- e })
+	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onGpsEvent","params":{"event":"fix_acquired","valid":true,"lat":37.1,"lon":-122.2}}`)
+
+	select {
+	case evt := <-received:
+		if evt.Event != "fix_acquired" || !evt.Valid {
+			t.Fatalf("unexpected gps event: %+v", evt)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for OnGpsEvent callback")
+	}
+}
+
+func TestClient_OnLocationEvent(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	received := make(chan LocationEvent, 1)
+	c.OnLocationEvent(func(e LocationEvent) { received <- e })
+	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onLocationEvent","params":{"event":"received","peer":"AABBCCDD","tier":1,"timestamp_ms":1730000000}}`)
+
+	select {
+	case evt := <-received:
+		if evt.Event != "received" || evt.Peer != "AABBCCDD" {
+			t.Fatalf("unexpected location event: %+v", evt)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for OnLocationEvent callback")
+	}
+}
+
 func TestClient_Config(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer c.Close()

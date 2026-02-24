@@ -144,6 +144,37 @@ type BroadcastDelivery struct {
 	TimestampMs int64  `json:"timestamp_ms,omitempty"`
 }
 
+// WifiEvent is delivered via bramble.onWifiEvent notifications.
+type WifiEvent struct {
+	Event     string `json:"event"`
+	Mode      string `json:"mode"`
+	Connected bool   `json:"connected"`
+	SSID      string `json:"ssid,omitempty"`
+	IP        string `json:"ip,omitempty"`
+	RSSI      int    `json:"rssi,omitempty"`
+}
+
+// GpsEvent is delivered via bramble.onGpsEvent notifications.
+type GpsEvent struct {
+	Event string  `json:"event"`
+	Valid bool    `json:"valid,omitempty"`
+	Lat   float64 `json:"lat,omitempty"`
+	Lon   float64 `json:"lon,omitempty"`
+	AltM  int     `json:"alt_m,omitempty"`
+	Sats  int     `json:"sats,omitempty"`
+}
+
+// LocationEvent is delivered via bramble.onLocationEvent notifications.
+type LocationEvent struct {
+	Event       string `json:"event"`
+	Peer        string `json:"peer,omitempty"`
+	Tier        int    `json:"tier"`
+	TimestampMs uint32 `json:"timestamp_ms"`
+	RSSI        int    `json:"rssi,omitempty"`
+	SNR         int    `json:"snr,omitempty"`
+	Count       int    `json:"count,omitempty"`
+}
+
 // ProbeResult is delivered via bramble.onProbeResult / probe.ack notifications.
 type ProbeResult struct {
 	ResponderAddr string   `json:"responderAddr"`
