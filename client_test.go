@@ -238,7 +238,7 @@ func TestClient_Config(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer c.Close()
 
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"node_name":"mynode","address":"1191C6E0","radio":{"frequency_mhz":915,"sf":9,"bw_hz":125000,"tx_power_dbm":17,"profile":"long_range"},"channels":[{"id":0,"name":"public","hasPsk":false,"epoch":0,"is_default":true},{"id":1,"name":"team","hasPsk":true,"epoch":7,"is_default":false}]}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"node_name":"mynode","address":"1191C6E0","radio":{"frequency_mhz":915,"sf":9,"bw_hz":125000,"tx_power_dbm":17,"profile":"long_range"},"channels":[{"id":0,"name":"public","hasPsk":false,"epoch":0,"is_default":true},{"id":1,"name":"team","hasPsk":true,"epoch":7,"is_default":false}],"location":{"enabled":true,"default_tier":"normal","interval_s":300,"source":"gps","contact_rules":[{"address":"AABBCCDD","enabled":true,"tier":"critical","interval_s":60}],"channel_targets":[{"channel":0,"enabled":true,"tier":"normal","interval_s":120}]}}}`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -262,6 +262,12 @@ func TestClient_Config(t *testing.T) {
 	if cfg.Channels[1].Epoch != 7 {
 		t.Fatalf("channel[1].Epoch: got %d, want 7", cfg.Channels[1].Epoch)
 	}
+	if cfg.Location.DefaultTier == nil || *cfg.Location.DefaultTier != "normal" {
+		t.Fatalf("expected location.default_tier=normal, got %+v", cfg.Location.DefaultTier)
+	}
+	if len(cfg.Location.ContactRules) != 1 || cfg.Location.ContactRules[0].Address != "AABBCCDD" {
+		t.Fatalf("unexpected location.contact_rules decode: %+v", cfg.Location.ContactRules)
+	}
 }
 
 func TestClient_SetRadio(t *testing.T) {
@@ -273,6 +279,52 @@ func TestClient_SetRadio(t *testing.T) {
 	sf := 10
 	if err := c.SetRadio(ctx, RadioConfig{SF: &sf}); err != nil {
 		t.Fatalf("SetRadio error: %v", err)
+	}
+}
+
+func TestClient_PeerLocations_CanonicalOnly(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"peerLocations":[{"addr":"AABBCCDD","name":"peer1","tier":"normal","position":null,"online":true,"lastUpdatedMs":1234}],"peers":[{"addr":"DEADBEEF","name":"legacy","tier":"normal","position":null,"online":false,"lastUpdatedMs":5678}]}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	peers, err := c.PeerLocations(ctx)
+	if err != nil {
+		t.Fatalf("PeerLocations error: %v", err)
+	}
+	if len(peers) != 1 || peers[0].Addr != "AABBCCDD" {
+		t.Fatalf("expected canonical peerLocations only, got %+v", peers)
+	}
+}
+
+func TestClient_SetLocationConfig_UsesCanonicalDefaultTierField(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"ok":true}}`)
+
+	enabled := true
+	defaultTier := "critical"
+	intervalS := 120
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	err := c.SetLocationConfig(ctx, LocationConfig{Enabled: &enabled, DefaultTier: &defaultTier, IntervalS: &intervalS})
+	if err != nil {
+		t.Fatalf("SetLocationConfig error: %v", err)
+	}
+
+	sent := mock.Sent()
+	if len(sent) != 1 {
+		t.Fatalf("expected 1 sent request, got %d", len(sent))
+	}
+	if !strings.Contains(sent[0], `"default_tier":"critical"`) || !strings.Contains(sent[0], `"interval_s":120`) {
+		t.Fatalf("expected canonical location fields in request, got: %s", sent[0])
+	}
+	if strings.Contains(sent[0], `"tier":"critical"`) {
+		t.Fatalf("did not expect tier compatibility alias in request: %s", sent[0])
 	}
 }
 

@@ -199,10 +199,11 @@ type OkResponse struct {
 // ConfigResponse is returned by bramble.getConfig.
 // Matches firmware wire format.
 type ConfigResponse struct {
-	NodeName string      `json:"node_name"`
-	Address  string      `json:"address"`
-	Radio    ConfigRadio `json:"radio"`
-	Channels []Channel   `json:"channels"`
+	NodeName string         `json:"node_name"`
+	Address  string         `json:"address"`
+	Radio    ConfigRadio    `json:"radio"`
+	Channels []Channel      `json:"channels"`
+	Location LocationConfig `json:"location"`
 }
 
 // ConfigRadio is the radio section of ConfigResponse.
@@ -224,12 +225,30 @@ type RadioConfig struct {
 	FreqMhz    *float64 `json:"freqMhz,omitempty"`
 }
 
-// LocationConfig contains the location configuration for bramble.setLocationConfig.
+// LocationContactRule is a per-peer location sharing policy rule.
+type LocationContactRule struct {
+	Address   string `json:"address"`
+	Enabled   *bool  `json:"enabled,omitempty"`
+	Tier      string `json:"tier,omitempty"`
+	IntervalS *int   `json:"interval_s,omitempty"`
+}
+
+// LocationChannelTarget is a per-channel location sharing policy rule.
+type LocationChannelTarget struct {
+	Channel   int    `json:"channel"`
+	Enabled   *bool  `json:"enabled,omitempty"`
+	Tier      string `json:"tier,omitempty"`
+	IntervalS *int   `json:"interval_s,omitempty"`
+}
+
+// LocationConfig contains the location configuration for bramble.getConfig and bramble.setLocationConfig.
 type LocationConfig struct {
-	Enabled                 *bool `json:"enabled,omitempty"`
-	DefaultIntervalSec      *int  `json:"defaultIntervalSec,omitempty"`
-	DefaultDistanceTriggerM *int  `json:"defaultDistanceTriggerM,omitempty"`
-	StationaryBackoff       *int  `json:"stationaryBackoff,omitempty"`
+	Enabled        *bool                   `json:"enabled,omitempty"`
+	DefaultTier    *string                 `json:"default_tier,omitempty"`
+	IntervalS      *int                    `json:"interval_s,omitempty"`
+	Source         *string                 `json:"source,omitempty"`
+	ContactRules   []LocationContactRule   `json:"contact_rules,omitempty"`
+	ChannelTargets []LocationChannelTarget `json:"channel_targets,omitempty"`
 }
 
 // ── Traffic Debug Types ──────────────────────────────────────────────────────

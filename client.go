@@ -248,15 +248,11 @@ func (c *Client) PeerLocations(ctx context.Context) ([]LocationPeer, error) {
 	}
 	var resp struct {
 		PeerLocations []LocationPeer `json:"peerLocations"`
-		Peers         []LocationPeer `json:"peers"`
 	}
 	if err := json.Unmarshal(raw, &resp); err != nil {
 		return nil, fmt.Errorf("bramble: decode PeerLocationsResponse: %w", err)
 	}
-	if len(resp.PeerLocations) > 0 {
-		return resp.PeerLocations, nil
-	}
-	return resp.Peers, nil
+	return resp.PeerLocations, nil
 }
 
 // ── Action / Config Methods ───────────────────────────────────────────────────

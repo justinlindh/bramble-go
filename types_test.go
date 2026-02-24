@@ -47,7 +47,7 @@ func TestRadioConfigMarshalPointers(t *testing.T) {
 }
 
 func TestLocationPeerUnmarshalOptionalPosition(t *testing.T) {
-	withPos := []byte(`{"addr":"0x1","name":"n","tier":"normal","online":true,"lastUpdatedMs":5,"position":{"lat":1,"lon":2,"alt":3,"accuracy":4,"timestampMs":6}}`)
+	withPos := []byte(`{"addr":"ABCDEF01","name":"n","tier":"normal","online":true,"lastUpdatedMs":5,"position":{"lat":1,"lon":2,"alt":3,"accuracy":4,"timestampMs":6}}`)
 	var lp LocationPeer
 	if err := json.Unmarshal(withPos, &lp); err != nil {
 		t.Fatalf("unmarshal with position failed: %v", err)
@@ -55,14 +55,41 @@ func TestLocationPeerUnmarshalOptionalPosition(t *testing.T) {
 	if lp.Position == nil || lp.Position.Lat != 1 || lp.Position.TimestampMs != 6 {
 		t.Fatalf("unexpected position decode: %+v", lp.Position)
 	}
+	if lp.Addr != "ABCDEF01" {
+		t.Fatalf("expected addr string hex, got %q", lp.Addr)
+	}
 
-	withoutPos := []byte(`{"addr":"0x1","name":"n","tier":"normal","online":false,"lastUpdatedMs":5}`)
+	withoutPos := []byte(`{"addr":"ABCDEF01","name":"n","tier":"normal","online":false,"lastUpdatedMs":5}`)
 	var lpNoPos LocationPeer
 	if err := json.Unmarshal(withoutPos, &lpNoPos); err != nil {
 		t.Fatalf("unmarshal without position failed: %v", err)
 	}
 	if lpNoPos.Position != nil {
 		t.Fatalf("expected nil position when omitted, got %+v", lpNoPos.Position)
+	}
+}
+
+func TestLocationConfigMarshalCanonicalFieldNames(t *testing.T) {
+	enabled := true
+	defaultTier := "critical"
+	intervalS := 90
+	source := "gps"
+	cfg := LocationConfig{
+		Enabled:     &enabled,
+		DefaultTier: &defaultTier,
+		IntervalS:   &intervalS,
+		Source:      &source,
+	}
+	out, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	got := string(out)
+	if !contains(got, `"default_tier":"critical"`) || !contains(got, `"interval_s":90`) || !contains(got, `"source":"gps"`) {
+		t.Fatalf("missing canonical location fields: %s", got)
+	}
+	if contains(got, `"tier"`) {
+		t.Fatalf("should not emit compatibility tier alias: %s", got)
 	}
 }
 
