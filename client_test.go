@@ -336,6 +336,41 @@ func TestClient_SetRadio(t *testing.T) {
 	}
 }
 
+func TestClient_OTAUpdate(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"ok":true,"note":"ota accepted","partition":"app0"}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	resp, err := c.OTAUpdate(ctx, "http://192.0.2.0:8088/bramble.bin")
+	if err != nil {
+		t.Fatalf("OTAUpdate error: %v", err)
+	}
+	if !resp.OK {
+		t.Fatalf("ok: got false, want true")
+	}
+	if resp.Note != "ota accepted" {
+		t.Fatalf("note: got %q, want ota accepted", resp.Note)
+	}
+	if resp.Partition != "app0" {
+		t.Fatalf("partition: got %q, want app0", resp.Partition)
+	}
+
+	sent := mock.Sent()
+	if len(sent) != 1 {
+		t.Fatalf("expected 1 sent request, got %d", len(sent))
+	}
+	if !strings.Contains(sent[0], `"method":"bramble.otaUpdate"`) {
+		t.Fatalf("expected bramble.otaUpdate request, got: %s", sent[0])
+	}
+	if !strings.Contains(sent[0], `"url":"http://192.0.2.0:8088/bramble.bin"`) {
+		t.Fatalf("expected URL param in request, got: %s", sent[0])
+	}
+}
+
 func TestClient_PeerLocations_CanonicalOnly(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer c.Close()

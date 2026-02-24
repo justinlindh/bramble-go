@@ -489,6 +489,19 @@ func (c *Client) Reboot(ctx context.Context) error {
 	return checkOK(raw, "reboot")
 }
 
+// OTAUpdate triggers an OTA firmware update from the provided URL.
+func (c *Client) OTAUpdate(ctx context.Context, url string) (*OTAUpdateResponse, error) {
+	raw, err := c.proto.Call(ctx, "bramble.otaUpdate", OTAUpdateParams{URL: url})
+	if err != nil {
+		return nil, err
+	}
+	var resp OTAUpdateResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode OTAUpdateResponse: %w", err)
+	}
+	return &resp, nil
+}
+
 // Config returns the full node configuration.
 func (c *Client) Config(ctx context.Context) (*ConfigResponse, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getConfig", nil)

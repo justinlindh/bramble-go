@@ -222,6 +222,18 @@ type AddChannelResult struct {
 	Index int `json:"index"`
 }
 
+// OTAUpdateParams contains parameters for bramble.otaUpdate.
+type OTAUpdateParams struct {
+	URL string `json:"url"`
+}
+
+// OTAUpdateResponse is returned by bramble.otaUpdate.
+type OTAUpdateResponse struct {
+	OK        bool   `json:"ok"`
+	Note      string `json:"note,omitempty"`
+	Partition string `json:"partition,omitempty"`
+}
+
 // OkResponse is a generic success response.
 type OkResponse struct {
 	OK bool `json:"ok"`
