@@ -172,6 +172,23 @@ func (c *Client) Version(ctx context.Context) (*VersionResponse, error) {
 	return &resp, nil
 }
 
+// DeliveryEvents returns persisted delivery telemetry events since the given sequence.
+func (c *Client) DeliveryEvents(ctx context.Context, sinceEventSeq uint32, limit uint32) (*DeliveryReplayResponse, error) {
+	params := map[string]any{"sinceEventSeq": sinceEventSeq}
+	if limit > 0 {
+		params["limit"] = limit
+	}
+	raw, err := c.proto.Call(ctx, "bramble.getDeliveryEvents", params)
+	if err != nil {
+		return nil, err
+	}
+	var resp DeliveryReplayResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode DeliveryReplayResponse: %w", err)
+	}
+	return &resp, nil
+}
+
 // Neighbors returns the list of direct radio neighbors.
 func (c *Client) Neighbors(ctx context.Context) ([]Neighbor, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getNeighbors", nil)

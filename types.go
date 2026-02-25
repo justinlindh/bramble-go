@@ -16,17 +16,18 @@ type Position struct {
 // StatusResponse is returned by bramble.getStatus.
 // Field names match the firmware JSON wire format.
 type StatusResponse struct {
-	Address         string `json:"address"`
-	FirmwareVersion string `json:"firmware_version"`
-	ProtocolVersion string `json:"protocol_version"`
-	Hardware        string `json:"hardware"`
-	RadioOk         bool   `json:"radio_ok"`
-	Peers           int    `json:"peers"`
-	BeaconTx        int    `json:"beacon_tx"`
-	BeaconRx        int    `json:"beacon_rx"`
-	PacketsTx       int    `json:"packets_tx"`
-	PacketsRx       int    `json:"packets_rx"`
-	UptimeSec       int    `json:"uptime_s"`
+	Address                   string `json:"address"`
+	FirmwareVersion           string `json:"firmware_version"`
+	ProtocolVersion           string `json:"protocol_version"`
+	Hardware                  string `json:"hardware"`
+	RadioOk                   bool   `json:"radio_ok"`
+	Peers                     int    `json:"peers"`
+	BeaconTx                  int    `json:"beacon_tx"`
+	BeaconRx                  int    `json:"beacon_rx"`
+	PacketsTx                 int    `json:"packets_tx"`
+	PacketsRx                 int    `json:"packets_rx"`
+	UptimeSec                 int    `json:"uptime_s"`
+	SupportsDeliveryEventSync bool   `json:"supports_delivery_event_sync,omitempty"`
 }
 
 // IdentityResponse is returned by bramble.getIdentity.
@@ -37,9 +38,27 @@ type IdentityResponse struct {
 
 // VersionResponse is returned by bramble.getVersion.
 type VersionResponse struct {
-	FirmwareVersion string `json:"firmware_version"`
-	ProtocolVersion string `json:"protocol_version"`
-	Hardware        string `json:"hardware"`
+	FirmwareVersion           string `json:"firmware_version"`
+	ProtocolVersion           string `json:"protocol_version"`
+	Hardware                  string `json:"hardware"`
+	SupportsDeliveryEventSync bool   `json:"supports_delivery_event_sync,omitempty"`
+}
+
+// DeliveryReplayEvent is returned by bramble.getDeliveryEvents.
+type DeliveryReplayEvent struct {
+	EventSeq    uint32                 `json:"event_seq"`
+	EventID     string                 `json:"event_id,omitempty"`
+	EventType   string                 `json:"event_type"`
+	PacketID    string                 `json:"packet_id,omitempty"`
+	BroadcastID string                 `json:"broadcast_id,omitempty"`
+	TimestampMs int64                  `json:"timestamp_ms"`
+	Payload     map[string]interface{} `json:"payload,omitempty"`
+}
+
+// DeliveryReplayResponse is returned by bramble.getDeliveryEvents.
+type DeliveryReplayResponse struct {
+	Events         []DeliveryReplayEvent `json:"events"`
+	LatestEventSeq uint32                `json:"latest_event_seq"`
 }
 
 // PingResponse is returned by bramble.ping.
