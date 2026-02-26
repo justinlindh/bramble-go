@@ -24,7 +24,7 @@ func TestMessageMarshalOmitsEmptyOptionalFields(t *testing.T) {
 		t.Fatalf("marshal failed: %v", err)
 	}
 	got := string(out)
-	if contains(got, "tier") || contains(got, "msgId") {
+	if contains(got, "tier") || contains(got, "msg_id") {
 		t.Fatalf("optional fields should be omitted, got %s", got)
 	}
 }
@@ -38,16 +38,16 @@ func TestRadioConfigMarshalPointers(t *testing.T) {
 		t.Fatalf("marshal failed: %v", err)
 	}
 	got := string(out)
-	if !contains(got, `"sf":9`) || !contains(got, `"freqMhz":915.5`) {
+	if !contains(got, `"sf":9`) || !contains(got, `"freq_mhz":915.5`) {
 		t.Fatalf("missing set fields: %s", got)
 	}
-	if contains(got, "txPowerDbm") || contains(got, "bwKhz") || contains(got, "cr") {
+	if contains(got, "tx_power_dbm") || contains(got, "bw_khz") || contains(got, "cr") {
 		t.Fatalf("nil pointer fields should be omitted: %s", got)
 	}
 }
 
 func TestLocationPeerUnmarshalOptionalPosition(t *testing.T) {
-	withPos := []byte(`{"addr":"ABCDEF01","name":"n","tier":"normal","online":true,"lastUpdatedMs":5,"position":{"lat":1,"lon":2,"alt":3,"accuracy":4,"timestampMs":6}}`)
+	withPos := []byte(`{"addr":"ABCDEF01","name":"n","tier":"normal","online":true,"last_updated_ms":5,"position":{"lat":1,"lon":2,"alt":3,"accuracy":4,"timestamp_ms":6}}`)
 	var lp LocationPeer
 	if err := json.Unmarshal(withPos, &lp); err != nil {
 		t.Fatalf("unmarshal with position failed: %v", err)
@@ -59,7 +59,7 @@ func TestLocationPeerUnmarshalOptionalPosition(t *testing.T) {
 		t.Fatalf("expected addr string hex, got %q", lp.Addr)
 	}
 
-	withoutPos := []byte(`{"addr":"ABCDEF01","name":"n","tier":"normal","online":false,"lastUpdatedMs":5}`)
+	withoutPos := []byte(`{"addr":"ABCDEF01","name":"n","tier":"normal","online":false,"last_updated_ms":5}`)
 	var lpNoPos LocationPeer
 	if err := json.Unmarshal(withoutPos, &lpNoPos); err != nil {
 		t.Fatalf("unmarshal without position failed: %v", err)
@@ -112,8 +112,8 @@ func TestSendProbeResultUnmarshalFirmwareFormat(t *testing.T) {
 }
 
 func TestNeighborUnmarshalDeliveryRateAndAirtime(t *testing.T) {
-	// Firmware sends deliveryRate and airtimeRemaining as camelCase.
-	in := []byte(`{"address":"AABBCCDD","rssi":-80,"snr":7.5,"last_seen_ms":1000,"deliveryRate":204,"airtimeRemaining":75}`)
+	// Firmware sends delivery_rate and airtime_remaining as snake_case.
+	in := []byte(`{"address":"AABBCCDD","rssi":-80,"snr":7.5,"last_seen_ms":1000,"delivery_rate":204,"airtime_remaining":75}`)
 	var n Neighbor
 	if err := json.Unmarshal(in, &n); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)
@@ -164,7 +164,7 @@ func TestProbeResultUnmarshalFirmwareFormat(t *testing.T) {
 
 func TestAckUnmarshalFirmwareFormat(t *testing.T) {
 	// Firmware bramble.onAck notification format (delivery ack).
-	in := []byte(`{"from":"AABBCCDD","packet_id":"0000002A","status":"delivered","rssi_at_dest":-70,"relayPath":[{"addr":"AABBCCDD","rssi":-70}]}`)
+	in := []byte(`{"from":"AABBCCDD","packet_id":"0000002A","status":"delivered","rssi_at_dest":-70,"relay_path":[{"addr":"AABBCCDD","rssi":-70}]}`)
 	var a Ack
 	if err := json.Unmarshal(in, &a); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)

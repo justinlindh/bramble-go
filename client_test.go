@@ -146,7 +146,7 @@ func TestClient_BroadcastOnChannel(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer c.Close()
 
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"packetId":"A1B2C3D4","status":"sent"}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"packet_id":"A1B2C3D4","status":"sent"}}`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -292,7 +292,7 @@ func TestClient_Config(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer c.Close()
 
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"node_name":"mynode","address":"1191C6E0","radio":{"frequency_mhz":915,"sf":9,"bw_hz":125000,"tx_power_dbm":17,"profile":"long_range"},"channels":[{"id":0,"name":"public","hasPsk":false,"epoch":0,"is_default":true},{"id":1,"name":"team","hasPsk":true,"epoch":7,"is_default":false}],"location":{"enabled":true,"default_tier":"normal","interval_s":300,"source":"gps","contact_rules":[{"address":"AABBCCDD","enabled":true,"tier":"critical","interval_s":60}],"channel_targets":[{"channel":0,"enabled":true,"tier":"normal","interval_s":120}]}}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"node_name":"mynode","address":"1191C6E0","radio":{"frequency_mhz":915,"sf":9,"bw_hz":125000,"tx_power_dbm":17,"profile":"long_range"},"channels":[{"id":0,"name":"public","has_psk":false,"epoch":0,"is_default":true},{"id":1,"name":"team","has_psk":true,"epoch":7,"is_default":false}],"location":{"enabled":true,"default_tier":"normal","interval_s":300,"source":"gps","contact_rules":[{"address":"AABBCCDD","enabled":true,"tier":"critical","interval_s":60}],"channel_targets":[{"channel":0,"enabled":true,"tier":"normal","interval_s":120}]}}}`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -375,7 +375,7 @@ func TestClient_PeerLocations_CanonicalOnly(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer c.Close()
 
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"peerLocations":[{"addr":"AABBCCDD","name":"peer1","tier":"normal","position":null,"online":true,"lastUpdatedMs":1234}],"peers":[{"addr":"DEADBEEF","name":"legacy","tier":"normal","position":null,"online":false,"lastUpdatedMs":5678}]}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"peerLocations":[{"addr":"AABBCCDD","name":"peer1","tier":"normal","position":null,"online":true,"last_updated_ms":1234}],"peers":[{"addr":"DEADBEEF","name":"legacy","tier":"normal","position":null,"online":false,"last_updated_ms":5678}]}}`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

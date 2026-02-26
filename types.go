@@ -10,7 +10,7 @@ type Position struct {
 	Accuracy    float64 `json:"accuracy"`
 	Speed       float64 `json:"speed,omitempty"`
 	Heading     float64 `json:"heading,omitempty"`
-	TimestampMs int64   `json:"timestampMs"`
+	TimestampMs int64   `json:"timestamp_ms"`
 }
 
 // StatusResponse is returned by bramble.getStatus.
@@ -78,9 +78,9 @@ type Neighbor struct {
 	// (relative duration, not an absolute timestamp).
 	LastSeenAgoMs int64 `json:"last_seen_ms"`
 	// DeliveryRate is 0-255 where 255 = 100% packet delivery rate.
-	DeliveryRate int `json:"deliveryRate"`
+	DeliveryRate int `json:"delivery_rate"`
 	// AirtimeRemaining is 0-100% airtime budget remaining for this neighbor.
-	AirtimeRemaining int `json:"airtimeRemaining"`
+	AirtimeRemaining int `json:"airtime_remaining"`
 }
 
 // Route is a routing table entry.
@@ -98,7 +98,7 @@ type Route struct {
 type Channel struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
-	HasPsk    bool   `json:"hasPsk,omitempty"`
+	HasPsk    bool   `json:"has_psk,omitempty"`
 	Epoch     int    `json:"epoch,omitempty"`
 	IsDefault bool   `json:"is_default"`
 }
@@ -111,16 +111,16 @@ type Message struct {
 	Tier      string `json:"tier,omitempty"`
 	// Timestamp is seconds since epoch (firmware key: timestamp_s).
 	Timestamp int64  `json:"timestamp_s"`
-	MsgID     string `json:"msgId,omitempty"`
+	MsgID     string `json:"msg_id,omitempty"`
 }
 
 // AirtimeTier holds the airtime budget for a single priority tier.
 type AirtimeTier struct {
 	Name        string `json:"name"`
-	RemainingMs int    `json:"remainingMs"`
-	MaxMs       int    `json:"maxMs"`
-	UsedPct     int    `json:"usedPct"`
-	RefillAtMs  int64  `json:"refillAtMs"`
+	RemainingMs int    `json:"remaining_ms"`
+	MaxMs       int    `json:"max_ms"`
+	UsedPct     int    `json:"used_pct"`
+	RefillAtMs  int64  `json:"refill_at_ms"`
 }
 
 // AirtimeStats holds all airtime tier data returned by bramble.getAirtime.
@@ -132,8 +132,8 @@ type AirtimeStats struct {
 type LocationContact struct {
 	Addr             string `json:"addr"`
 	Tier             string `json:"tier"`
-	IntervalSec      int    `json:"intervalSec"`
-	DistanceTriggerM int    `json:"distanceTriggerM"`
+	IntervalSec      int    `json:"interval_sec"`
+	DistanceTriggerM int    `json:"distance_trigger_m"`
 }
 
 // LocationPeer holds location data for a peer node.
@@ -142,9 +142,9 @@ type LocationPeer struct {
 	Name          string    `json:"name"`
 	Tier          string    `json:"tier"`
 	Position      *Position `json:"position,omitempty"`
-	GridSquare    string    `json:"gridSquare,omitempty"`
+	GridSquare    string    `json:"grid_square,omitempty"`
 	Online        bool      `json:"online"`
-	LastUpdatedMs int64     `json:"lastUpdatedMs"`
+	LastUpdatedMs int64     `json:"last_updated_ms"`
 }
 
 // RelayHop is a single hop in a relay path.
@@ -162,7 +162,7 @@ type Ack struct {
 	PacketID   string     `json:"packet_id"`
 	Status     string     `json:"status"`
 	RSSIAtDest int        `json:"rssi_at_dest,omitempty"`
-	RelayPath  []RelayHop `json:"relayPath,omitempty"`
+	RelayPath  []RelayHop `json:"relay_path,omitempty"`
 }
 
 // BroadcastDelivery is the telemetry payload for bramble.onBroadcastDelivery.
@@ -220,7 +220,7 @@ type ProbeResult struct {
 
 // ProbeComplete is delivered when a probe window closes.
 type ProbeComplete struct {
-	ProbeID int `json:"probeId"`
+	ProbeID int `json:"probe_id"`
 }
 
 // LocationUpdate is delivered via location.update notifications.
@@ -230,13 +230,13 @@ type LocationUpdate struct {
 	Tier          string    `json:"tier"`
 	Position      *Position `json:"position,omitempty"`
 	Online        bool      `json:"online"`
-	LastUpdatedMs int64     `json:"lastUpdatedMs"`
+	LastUpdatedMs int64     `json:"last_updated_ms"`
 }
 
 // SendResult is returned by bramble.sendMessage / bramble.sendBroadcast.
 type SendResult struct {
 	MessageID      string `json:"message_id,omitempty"`
-	PacketID       string `json:"packetId,omitempty"`
+	PacketID       string `json:"packet_id,omitempty"`
 	BroadcastID    string `json:"broadcast_id,omitempty"`
 	Status         string `json:"status"`
 	Fragmented     bool   `json:"fragmented,omitempty"`
@@ -303,11 +303,11 @@ type ConfigRadio struct {
 // RadioConfig contains the radio parameters for bramble.setRadio.
 // All fields are optional pointers; nil means leave unchanged.
 type RadioConfig struct {
-	TxPowerDbm *int     `json:"txPowerDbm,omitempty"`
+	TxPowerDbm *int     `json:"tx_power_dbm,omitempty"`
 	SF         *int     `json:"sf,omitempty"`
-	BwKhz      *int     `json:"bwKhz,omitempty"`
+	BwKhz      *int     `json:"bw_khz,omitempty"`
 	CR         *int     `json:"cr,omitempty"`
-	FreqMhz    *float64 `json:"freqMhz,omitempty"`
+	FreqMhz    *float64 `json:"freq_mhz,omitempty"`
 }
 
 // LocationContactRule is a per-peer location sharing policy rule.
