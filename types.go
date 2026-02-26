@@ -72,6 +72,7 @@ type PingResponse struct {
 // Firmware sends "address" as hex string, not numeric.
 type Neighbor struct {
 	Address string  `json:"address"`
+	Name    string  `json:"name,omitempty"`
 	RSSI    int     `json:"rssi"`
 	SNR     float64 `json:"snr"`
 	// LastSeenAgoMs is milliseconds since this neighbor was last heard
