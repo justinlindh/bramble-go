@@ -77,6 +77,10 @@ type Neighbor struct {
 	// LastSeenAgoMs is milliseconds since this neighbor was last heard
 	// (relative duration, not an absolute timestamp).
 	LastSeenAgoMs int64 `json:"last_seen_ms"`
+	// DeliveryRate is 0-255 where 255 = 100% packet delivery rate.
+	DeliveryRate int `json:"deliveryRate"`
+	// AirtimeRemaining is 0-100% airtime budget remaining for this neighbor.
+	AirtimeRemaining int `json:"airtimeRemaining"`
 }
 
 // Route is a routing table entry.
@@ -105,7 +109,8 @@ type Message struct {
 	To        string `json:"to"`
 	Text      string `json:"text"`
 	Tier      string `json:"tier,omitempty"`
-	Timestamp int64  `json:"timestamp"`
+	// Timestamp is seconds since epoch (firmware key: timestamp_s).
+	Timestamp int64  `json:"timestamp_s"`
 	MsgID     string `json:"msgId,omitempty"`
 }
 
@@ -149,10 +154,15 @@ type RelayHop struct {
 }
 
 // Ack is the delivery acknowledgment payload for bramble.onAck.
+// Field names match the firmware wire format.
 type Ack struct {
-	PacketID  int        `json:"packetId"`
-	Status    string     `json:"status"`
-	RelayPath []RelayHop `json:"relayPath,omitempty"`
+	// From is the source node address as a hex string (present on delivery acks).
+	From string `json:"from,omitempty"`
+	// PacketID is the acknowledged packet identifier as a hex string (firmware key: packet_id).
+	PacketID   string     `json:"packet_id"`
+	Status     string     `json:"status"`
+	RSSIAtDest int        `json:"rssi_at_dest,omitempty"`
+	RelayPath  []RelayHop `json:"relayPath,omitempty"`
 }
 
 // BroadcastDelivery is the telemetry payload for bramble.onBroadcastDelivery.
@@ -194,15 +204,18 @@ type LocationEvent struct {
 	Count       int    `json:"count,omitempty"`
 }
 
-// ProbeResult is delivered via bramble.onProbeResult / probe.ack notifications.
+// ProbeResult is delivered via bramble.onProbeResult notifications.
+// Field names match the firmware wire format (snake_case).
 type ProbeResult struct {
-	ResponderAddr string   `json:"responderAddr"`
-	HopCount      int      `json:"hopCount"`
-	RSSI          int      `json:"rssi"`
-	SNR           float64  `json:"snr"`
-	PathLen       int      `json:"pathLen"`
-	RelayPath     []string `json:"relayPath,omitempty"`
-	ReceivedAt    int64    `json:"receivedAt"`
+	// Address is the responder node address as a hex string (firmware key: address).
+	Address    string  `json:"address"`
+	Hops       int     `json:"hops"`
+	RSSI       int     `json:"rssi"`
+	SNR        float64 `json:"snr"`
+	LatencyMs  int64   `json:"latency_ms"`
+	ProbeRound int     `json:"probe_round"`
+	// ProbeID is the probe identifier as a hex string (firmware key: probe_id).
+	ProbeID string `json:"probe_id,omitempty"`
 }
 
 // ProbeComplete is delivered when a probe window closes.
@@ -235,11 +248,15 @@ type SendResult struct {
 }
 
 // SendProbeResult is returned by bramble.sendProbe.
+// Firmware sends probe_id (string), ack_window (int), ok (bool).
 type SendProbeResult struct {
-	ProbeID    int    `json:"probeId,omitempty"`
+	// ProbeIDHex is the probe ID as a hex string (firmware key: probe_id).
 	ProbeIDHex string `json:"probe_id,omitempty"`
-	AckWindow  int    `json:"ackWindow,omitempty"`
-	OK         bool   `json:"ok,omitempty"`
+	// AckWindow is the acknowledgment window in seconds (firmware key: ack_window).
+	AckWindow int `json:"ack_window,omitempty"`
+	OK        bool `json:"ok,omitempty"`
+	// ProbeID is a convenience field parsed from ProbeIDHex by the client; not a JSON field.
+	ProbeID int `json:"-"`
 }
 
 // AddChannelResult is returned by bramble.addChannel.

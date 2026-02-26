@@ -200,15 +200,15 @@ func TestClient_OnAck(t *testing.T) {
 	received := make(chan Ack, 1)
 	c.OnAck(func(a Ack) { received <- a })
 
-	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onAck","params":{"packetId":42,"status":"delivered"}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onAck","params":{"packet_id":"0000002A","status":"delivered"}}`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	select {
 	case a := <-received:
-		if a.PacketID != 42 {
-			t.Errorf("packetId: got %d, want 42", a.PacketID)
+		if a.PacketID != "0000002A" {
+			t.Errorf("packet_id: got %q, want 0000002A", a.PacketID)
 		}
 	case <-ctx.Done():
 		t.Fatal("timed out waiting for OnAck callback")

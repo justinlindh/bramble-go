@@ -31,7 +31,7 @@ func main() {
 	})
 
 	client.OnAck(func(a bramble.Ack) {
-		fmt.Printf("[ACK] packet#%d status=%s\n", a.PacketID, a.Status)
+		fmt.Printf("[ACK] packet#%s status=%s\n", a.PacketID, a.Status)
 	})
 
 	client.OnNeighborChange(func() {

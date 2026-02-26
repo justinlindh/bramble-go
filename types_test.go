@@ -93,22 +93,96 @@ func TestLocationConfigMarshalCanonicalFieldNames(t *testing.T) {
 	}
 }
 
-func TestSendProbeResultSupportsLegacyAndCurrentFields(t *testing.T) {
-	cur := []byte(`{"probeId":42,"ackWindow":15,"ok":true}`)
+func TestSendProbeResultUnmarshalFirmwareFormat(t *testing.T) {
+	// Firmware sends: {"ok":true,"probe_id":"0000002A","ack_window":5,"rounds_total":3}
+	fw := []byte(`{"ok":true,"probe_id":"0000002A","ack_window":5}`)
 	var r SendProbeResult
-	if err := json.Unmarshal(cur, &r); err != nil {
-		t.Fatalf("unmarshal current failed: %v", err)
+	if err := json.Unmarshal(fw, &r); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
 	}
-	if r.ProbeID != 42 || r.AckWindow != 15 || !r.OK {
-		t.Fatalf("unexpected current decode: %+v", r)
+	if r.ProbeIDHex != "0000002A" {
+		t.Fatalf("expected ProbeIDHex=0000002A, got %q", r.ProbeIDHex)
 	}
+	if r.AckWindow != 5 {
+		t.Fatalf("expected AckWindow=5, got %d", r.AckWindow)
+	}
+	if !r.OK {
+		t.Fatalf("expected OK=true")
+	}
+}
 
-	legacy := []byte(`{"probe_id":"0x2a"}`)
-	if err := json.Unmarshal(legacy, &r); err != nil {
-		t.Fatalf("unmarshal legacy failed: %v", err)
+func TestNeighborUnmarshalDeliveryRateAndAirtime(t *testing.T) {
+	// Firmware sends deliveryRate and airtimeRemaining as camelCase.
+	in := []byte(`{"address":"AABBCCDD","rssi":-80,"snr":7.5,"last_seen_ms":1000,"deliveryRate":204,"airtimeRemaining":75}`)
+	var n Neighbor
+	if err := json.Unmarshal(in, &n); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
 	}
-	if r.ProbeIDHex != "0x2a" {
-		t.Fatalf("unexpected legacy decode: %+v", r)
+	if n.DeliveryRate != 204 {
+		t.Fatalf("expected DeliveryRate=204, got %d", n.DeliveryRate)
+	}
+	if n.AirtimeRemaining != 75 {
+		t.Fatalf("expected AirtimeRemaining=75, got %d", n.AirtimeRemaining)
+	}
+	if n.LastSeenAgoMs != 1000 {
+		t.Fatalf("expected LastSeenAgoMs=1000, got %d", n.LastSeenAgoMs)
+	}
+}
+
+func TestMessageUnmarshalTimestampS(t *testing.T) {
+	// Firmware sends timestamp_s (seconds), not timestamp.
+	in := []byte(`{"from":"AABBCCDD","to":"EEFF0011","text":"hello","timestamp_s":1700000000}`)
+	var m Message
+	if err := json.Unmarshal(in, &m); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if m.Timestamp != 1700000000 {
+		t.Fatalf("expected Timestamp=1700000000, got %d", m.Timestamp)
+	}
+}
+
+func TestProbeResultUnmarshalFirmwareFormat(t *testing.T) {
+	// Firmware bramble.onProbeResult notification format.
+	in := []byte(`{"address":"AABBCCDD","hops":2,"rssi":-65,"snr":9.5,"latency_ms":350,"probe_round":1,"probe_id":"0000002A"}`)
+	var pr ProbeResult
+	if err := json.Unmarshal(in, &pr); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if pr.Address != "AABBCCDD" {
+		t.Fatalf("expected Address=AABBCCDD, got %q", pr.Address)
+	}
+	if pr.Hops != 2 {
+		t.Fatalf("expected Hops=2, got %d", pr.Hops)
+	}
+	if pr.LatencyMs != 350 {
+		t.Fatalf("expected LatencyMs=350, got %d", pr.LatencyMs)
+	}
+	if pr.ProbeID != "0000002A" {
+		t.Fatalf("expected ProbeID=0000002A, got %q", pr.ProbeID)
+	}
+}
+
+func TestAckUnmarshalFirmwareFormat(t *testing.T) {
+	// Firmware bramble.onAck notification format (delivery ack).
+	in := []byte(`{"from":"AABBCCDD","packet_id":"0000002A","status":"delivered","rssi_at_dest":-70,"relayPath":[{"addr":"AABBCCDD","rssi":-70}]}`)
+	var a Ack
+	if err := json.Unmarshal(in, &a); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if a.PacketID != "0000002A" {
+		t.Fatalf("expected PacketID=0000002A, got %q", a.PacketID)
+	}
+	if a.From != "AABBCCDD" {
+		t.Fatalf("expected From=AABBCCDD, got %q", a.From)
+	}
+	if a.Status != "delivered" {
+		t.Fatalf("expected Status=delivered, got %q", a.Status)
+	}
+	if a.RSSIAtDest != -70 {
+		t.Fatalf("expected RSSIAtDest=-70, got %d", a.RSSIAtDest)
+	}
+	if len(a.RelayPath) != 1 {
+		t.Fatalf("expected 1 relay hop, got %d", len(a.RelayPath))
 	}
 }
 
