@@ -23,6 +23,8 @@ type Client struct {
 	onWifiEventFn         func(WifiEvent)
 	onGpsEventFn          func(GpsEvent)
 	onLocationEventFn     func(LocationEvent)
+	onProbeResultFn       func(ProbeResult)
+	onProbeCompleteFn     func(ProbeComplete)
 }
 
 // NewClient creates a new Client using the given transport.
@@ -71,6 +73,8 @@ func (c *Client) notifyLoop() {
 		onWifi := c.onWifiEventFn
 		onGps := c.onGpsEventFn
 		onLocation := c.onLocationEventFn
+		onProbeResult := c.onProbeResultFn
+		onProbeComplete := c.onProbeCompleteFn
 		c.mu.Unlock()
 
 		switch n.Method {
@@ -125,6 +129,20 @@ func (c *Client) notifyLoop() {
 				var evt LocationEvent
 				if json.Unmarshal(n.Params, &evt) == nil {
 					onLocation(evt)
+				}
+			}
+		case "bramble.onProbeResult":
+			if onProbeResult != nil {
+				var evt ProbeResult
+				if json.Unmarshal(n.Params, &evt) == nil {
+					onProbeResult(evt)
+				}
+			}
+		case "bramble.onProbeComplete":
+			if onProbeComplete != nil {
+				var evt ProbeComplete
+				if json.Unmarshal(n.Params, &evt) == nil {
+					onProbeComplete(evt)
 				}
 			}
 		}
@@ -595,6 +613,20 @@ func (c *Client) OnAck(fn func(Ack)) {
 func (c *Client) OnNeighborChange(fn func()) {
 	c.mu.Lock()
 	c.onNeighborFn = fn
+	c.mu.Unlock()
+}
+
+// OnProbeResult registers a callback invoked when a bramble.onProbeResult notification arrives.
+func (c *Client) OnProbeResult(fn func(ProbeResult)) {
+	c.mu.Lock()
+	c.onProbeResultFn = fn
+	c.mu.Unlock()
+}
+
+// OnProbeComplete registers a callback invoked when a bramble.onProbeComplete notification arrives.
+func (c *Client) OnProbeComplete(fn func(ProbeComplete)) {
+	c.mu.Lock()
+	c.onProbeCompleteFn = fn
 	c.mu.Unlock()
 }
 
