@@ -222,10 +222,16 @@ type LocationUpdate struct {
 
 // SendResult is returned by bramble.sendMessage / bramble.sendBroadcast.
 type SendResult struct {
-	MessageID   string `json:"message_id,omitempty"`
-	PacketID    string `json:"packetId,omitempty"`
-	BroadcastID string `json:"broadcast_id,omitempty"`
-	Status      string `json:"status"`
+	MessageID      string `json:"message_id,omitempty"`
+	PacketID       string `json:"packetId,omitempty"`
+	BroadcastID    string `json:"broadcast_id,omitempty"`
+	Status         string `json:"status"`
+	Fragmented     bool   `json:"fragmented,omitempty"`
+	FragmentsTotal int    `json:"fragments_total,omitempty"`
+	MaxBytes       int    `json:"max_bytes,omitempty"`
+	ActualBytes    int    `json:"actual_bytes,omitempty"`
+	Broadcast      bool   `json:"broadcast,omitempty"`
+	Channel        int    `json:"channel,omitempty"`
 }
 
 // SendProbeResult is returned by bramble.sendProbe.
