@@ -194,6 +194,22 @@ type ConfigResponse struct {
 }
 ```
 
+### Action Messages (`/me`)
+
+The SDK supports IRC-style action messages using the CTCP ACTION convention:
+
+```go
+// Sending an action message
+text := bramble.WrapAction("waves hello")
+// text == "\x01ACTION waves hello\x01"
+result, _ := client.SendBroadcast(ctx, text)
+
+// Detecting action messages
+msg := bramble.Message{Text: "\x01ACTION waves hello\x01"}
+msg.IsAction()   // true
+msg.ActionText() // "waves hello"
+```
+
 ## Protocol Compatibility
 
 This SDK negotiates protocol versions on connect. See [VERSIONING.md](https://github.com/justinlindh/bramble/src/branch/feature/ws-sdk-cli/VERSIONING.md) for the compatibility matrix.

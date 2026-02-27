@@ -187,3 +187,26 @@ func TestAckUnmarshalFirmwareFormat(t *testing.T) {
 }
 
 func contains(s, sub string) bool { return strings.Contains(s, sub) }
+
+func TestMessageIsAction(t *testing.T) {
+	m := Message{Text: "\x01ACTION waves hello\x01"}
+	if !m.IsAction() {
+		t.Fatal("expected IsAction")
+	}
+	if m.ActionText() != "waves hello" {
+		t.Fatalf("got %q", m.ActionText())
+	}
+
+	m2 := Message{Text: "normal message"}
+	if m2.IsAction() {
+		t.Fatal("expected not action")
+	}
+}
+
+func TestWrapAction(t *testing.T) {
+	got := WrapAction("waves hello")
+	want := "\x01ACTION waves hello\x01"
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
+	}
+}

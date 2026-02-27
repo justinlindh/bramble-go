@@ -2,6 +2,8 @@
 // It communicates using JSON-RPC 2.0 over serial (UART), WebSocket, or BLE.
 package bramble
 
+import "strings"
+
 // Position represents a GPS fix with accuracy and motion data.
 type Position struct {
 	Lat         float64 `json:"lat"`
@@ -390,4 +392,26 @@ type TrafficEvent struct {
 	PacketLen   int    `json:"packet_len"`
 	RSSI        int    `json:"rssi"` // 0 for TX events
 	IsTx        bool   `json:"is_tx"`
+}
+
+// ActionPrefix and ActionSuffix are the CTCP ACTION delimiters used for /me messages.
+const ActionPrefix = "\x01ACTION "
+const ActionSuffix = "\x01"
+
+// IsAction returns true if this message is a /me action.
+func (m Message) IsAction() bool {
+	return strings.HasPrefix(m.Text, ActionPrefix) && strings.HasSuffix(m.Text, ActionSuffix)
+}
+
+// ActionText returns the action text without CTCP wrapping, or empty string if not an action.
+func (m Message) ActionText() string {
+	if !m.IsAction() {
+		return ""
+	}
+	return m.Text[len(ActionPrefix) : len(m.Text)-len(ActionSuffix)]
+}
+
+// WrapAction wraps text in CTCP ACTION format for sending.
+func WrapAction(text string) string {
+	return ActionPrefix + text + ActionSuffix
 }
