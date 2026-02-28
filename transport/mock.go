@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 )
 
 // MockTransport is an in-memory transport for testing.
@@ -14,6 +15,7 @@ type MockTransport struct {
 	sent      [][]byte
 	connected bool
 	recvCh    chan []byte
+	queueSeq  int
 }
 
 // NewMock creates a new MockTransport ready for use in tests.
@@ -74,7 +76,13 @@ func (m *MockTransport) Info() string { return "mock" }
 
 // QueueResponse enqueues a raw JSON string to be returned by the next Receive call.
 func (m *MockTransport) QueueResponse(js string) {
+	m.mu.Lock()
+	m.queueSeq++
+	delay := time.Duration(m.queueSeq) * time.Millisecond
+	m.mu.Unlock()
+
 	go func() {
+		time.Sleep(delay)
 		m.recvCh <- []byte(js)
 	}()
 }
