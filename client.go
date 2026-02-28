@@ -323,35 +323,25 @@ func (c *Client) PeerLocations(ctx context.Context) ([]LocationPeer, error) {
 // Returns a SendResult containing the message_id for delivery tracking via OnAck.
 func (c *Client) Send(ctx context.Context, dest uint32, text string) (*SendResult, error) {
 	params := map[string]any{"dest": fmt.Sprintf("%08X", dest), "text": text}
-	raw, err := c.proto.Call(ctx, "bramble.sendMessage", params)
-	if err != nil {
-		return nil, err
-	}
-	var resp SendResult
-	if err := json.Unmarshal(raw, &resp); err != nil {
-		return nil, fmt.Errorf("bramble: decode SendResult: %w", err)
-	}
-	if resp.MessageID == "" && resp.PacketID != "" {
-		resp.MessageID = resp.PacketID
-	}
-	return &resp, nil
+	return c.sendMessageWithParams(ctx, params)
+}
+
+// SendCritical sends a unicast message marked as critical priority.
+func (c *Client) SendCritical(ctx context.Context, dest uint32, text string) (*SendResult, error) {
+	params := map[string]any{"dest": fmt.Sprintf("%08X", dest), "text": text, "critical": true}
+	return c.sendMessageWithParams(ctx, params)
 }
 
 // SendBroadcast sends a text message to all peers on the public channel.
 func (c *Client) SendBroadcast(ctx context.Context, text string) (*SendResult, error) {
 	params := map[string]any{"text": text}
-	raw, err := c.proto.Call(ctx, "bramble.sendBroadcast", params)
-	if err != nil {
-		return nil, err
-	}
-	var resp SendResult
-	if err := json.Unmarshal(raw, &resp); err != nil {
-		return nil, fmt.Errorf("bramble: decode SendResult: %w", err)
-	}
-	if resp.BroadcastID == "" && resp.MessageID != "" {
-		resp.BroadcastID = resp.MessageID
-	}
-	return &resp, nil
+	return c.sendBroadcastWithParams(ctx, params)
+}
+
+// SendBroadcastCritical sends a broadcast marked as critical priority.
+func (c *Client) SendBroadcastCritical(ctx context.Context, text string) (*SendResult, error) {
+	params := map[string]any{"text": text, "critical": true}
+	return c.sendBroadcastWithParams(ctx, params)
 }
 
 // Broadcast sends a text message to all peers on the public channel.
@@ -368,6 +358,21 @@ func (c *Client) BroadcastOnChannel(ctx context.Context, channel int, text strin
 		"text":    text,
 		"channel": channel,
 	}
+	return c.sendMessageWithParams(ctx, params)
+}
+
+// BroadcastOnChannelCritical sends a channel-wide message marked as critical priority.
+func (c *Client) BroadcastOnChannelCritical(ctx context.Context, channel int, text string) (*SendResult, error) {
+	params := map[string]any{
+		"dest":     "FFFFFFFE",
+		"text":     text,
+		"channel":  channel,
+		"critical": true,
+	}
+	return c.sendMessageWithParams(ctx, params)
+}
+
+func (c *Client) sendMessageWithParams(ctx context.Context, params map[string]any) (*SendResult, error) {
 	raw, err := c.proto.Call(ctx, "bramble.sendMessage", params)
 	if err != nil {
 		return nil, err
@@ -378,6 +383,21 @@ func (c *Client) BroadcastOnChannel(ctx context.Context, channel int, text strin
 	}
 	if resp.MessageID == "" && resp.PacketID != "" {
 		resp.MessageID = resp.PacketID
+	}
+	return &resp, nil
+}
+
+func (c *Client) sendBroadcastWithParams(ctx context.Context, params map[string]any) (*SendResult, error) {
+	raw, err := c.proto.Call(ctx, "bramble.sendBroadcast", params)
+	if err != nil {
+		return nil, err
+	}
+	var resp SendResult
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode SendResult: %w", err)
+	}
+	if resp.BroadcastID == "" && resp.MessageID != "" {
+		resp.BroadcastID = resp.MessageID
 	}
 	return &resp, nil
 }

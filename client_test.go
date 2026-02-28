@@ -171,6 +171,52 @@ func TestClient_BroadcastOnChannel(t *testing.T) {
 	}
 }
 
+func TestClient_SendCritical(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"packet_id":"A1B2C3D4","status":"sent"}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_, err := c.SendCritical(ctx, 0x12345678, "urgent")
+	if err != nil {
+		t.Fatalf("SendCritical error: %v", err)
+	}
+
+	sent := mock.Sent()
+	if len(sent) != 1 {
+		t.Fatalf("expected 1 sent request, got %d", len(sent))
+	}
+	if !strings.Contains(sent[0], `"critical":true`) {
+		t.Fatalf("expected critical=true in request, got: %s", sent[0])
+	}
+}
+
+func TestClient_SendBroadcastCritical(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"broadcast_id":"A1B2C3D4","status":"sent"}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_, err := c.SendBroadcastCritical(ctx, "urgent all")
+	if err != nil {
+		t.Fatalf("SendBroadcastCritical error: %v", err)
+	}
+
+	sent := mock.Sent()
+	if len(sent) != 1 {
+		t.Fatalf("expected 1 sent request, got %d", len(sent))
+	}
+	if !strings.Contains(sent[0], `"critical":true`) {
+		t.Fatalf("expected critical=true in request, got: %s", sent[0])
+	}
+}
+
 func TestClient_OnMessage(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer c.Close()
