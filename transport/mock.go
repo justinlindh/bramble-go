@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 )
 
 // MockTransport is an in-memory transport for testing.
@@ -76,8 +75,16 @@ func (m *MockTransport) Info() string { return "mock" }
 // QueueResponse enqueues a raw JSON string to be returned by the next Receive call.
 func (m *MockTransport) QueueResponse(js string) {
 	go func() {
-		time.Sleep(5 * time.Millisecond)
 		m.recvCh <- []byte(js)
+	}()
+}
+
+// InjectAsync enqueues raw bytes from a goroutine, simulating asynchronous inbound data.
+func (m *MockTransport) InjectAsync(data []byte) {
+	cp := make([]byte, len(data))
+	copy(cp, data)
+	go func() {
+		m.recvCh <- cp
 	}()
 }
 

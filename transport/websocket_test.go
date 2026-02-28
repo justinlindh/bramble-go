@@ -96,3 +96,83 @@ func TestWebSocketReconnectStopsOnClose(t *testing.T) {
 		t.Fatalf("expected ErrClosed, got %v", err)
 	}
 }
+
+func TestWebSocketConnectInitialDialSuccess(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer c.Close(websocket.StatusNormalClosure, "ok")
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+
+	w := NewWebSocket("ws" + srv.URL[len("http"):])
+	if err := w.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer w.Close()
+}
+
+func TestWebSocketConnectInvalidURL(t *testing.T) {
+	w := NewWebSocket("://bad-url")
+	err := w.Connect(context.Background())
+	if err == nil {
+		t.Fatal("expected Connect error for invalid URL")
+	}
+}
+
+func TestWebSocketConnectHandshakeError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("not a websocket handshake"))
+	}))
+	defer srv.Close()
+
+	w := NewWebSocket("ws" + srv.URL[len("http"):])
+	err := w.Connect(context.Background())
+	if err == nil {
+		t.Fatal("expected Connect handshake error")
+	}
+}
+
+func TestWebSocketSendAndReceiveSuccess(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer c.Close(websocket.StatusNormalClosure, "ok")
+		for {
+			_, data, err := c.Read(r.Context())
+			if err != nil {
+				return
+			}
+			if err := c.Write(r.Context(), websocket.MessageText, data); err != nil {
+				return
+			}
+		}
+	}))
+	defer srv.Close()
+
+	w := NewWebSocket("ws" + srv.URL[len("http"):])
+	if err := w.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+	defer w.Close()
+
+	if err := w.Send([]byte(`{"hello":"world"}`)); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	data, err := w.Receive(ctx)
+	if err != nil {
+		t.Fatalf("Receive: %v", err)
+	}
+	if string(data) != `{"hello":"world"}` {
+		t.Fatalf("unexpected echoed data: %s", string(data))
+	}
+}
