@@ -71,6 +71,47 @@ func TestClient_Status(t *testing.T) {
 	}
 }
 
+func TestClient_GetWifiStatus(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"mode":"station","ssid":"meshnet","ip":"192.0.2.0","rssi":-57,"mac":"AA:BB:CC:DD:EE:FF","clients":0}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	status, err := c.GetWifiStatus(ctx)
+	if err != nil {
+		t.Fatalf("GetWifiStatus error: %v", err)
+	}
+	if status.Mode != "station" {
+		t.Errorf("mode: got %q, want station", status.Mode)
+	}
+	if status.SSID != "meshnet" {
+		t.Errorf("ssid: got %q, want meshnet", status.SSID)
+	}
+	if status.IP != "192.0.2.0" {
+		t.Errorf("ip: got %q, want 192.0.2.0", status.IP)
+	}
+	if status.RSSI != -57 {
+		t.Errorf("rssi: got %d, want -57", status.RSSI)
+	}
+	if status.MAC != "AA:BB:CC:DD:EE:FF" {
+		t.Errorf("mac: got %q, want AA:BB:CC:DD:EE:FF", status.MAC)
+	}
+	if status.Clients != 0 {
+		t.Errorf("clients: got %d, want 0", status.Clients)
+	}
+
+	sent := mock.Sent()
+	if len(sent) != 1 {
+		t.Fatalf("expected 1 sent request, got %d", len(sent))
+	}
+	if !strings.Contains(sent[0], `"method":"bramble.getWifiStatus"`) {
+		t.Fatalf("expected bramble.getWifiStatus request, got: %s", sent[0])
+	}
+}
+
 func TestClient_Neighbors(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer c.Close()

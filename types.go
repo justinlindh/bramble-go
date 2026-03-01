@@ -32,6 +32,17 @@ type StatusResponse struct {
 	SupportsDeliveryEventSync bool   `json:"supports_delivery_event_sync,omitempty"`
 }
 
+// WifiStatus is returned by bramble.getWifiStatus.
+// Field names match firmware JSON wire format.
+type WifiStatus struct {
+	Mode    string `json:"mode"`
+	SSID    string `json:"ssid"`
+	IP      string `json:"ip"`
+	RSSI    int    `json:"rssi"`
+	MAC     string `json:"mac"`
+	Clients int    `json:"clients"`
+}
+
 // IdentityResponse is returned by bramble.getIdentity.
 type IdentityResponse struct {
 	Address    string `json:"address"`

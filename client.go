@@ -164,6 +164,19 @@ func (c *Client) Status(ctx context.Context) (*StatusResponse, error) {
 	return &resp, nil
 }
 
+// GetWifiStatus returns current WiFi mode, link, and AP client information.
+func (c *Client) GetWifiStatus(ctx context.Context) (*WifiStatus, error) {
+	raw, err := c.proto.Call(ctx, "bramble.getWifiStatus", nil)
+	if err != nil {
+		return nil, fmt.Errorf("bramble: get wifi status: %w", err)
+	}
+	var resp WifiStatus
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode WifiStatus: %w", err)
+	}
+	return &resp, nil
+}
+
 // Identity returns the node's address and public key hash.
 func (c *Client) Identity(ctx context.Context) (*IdentityResponse, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getIdentity", nil)
