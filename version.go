@@ -9,7 +9,7 @@ const (
 	MaxProtocolVersion = "0.5.0"
 
 	// SDKVersion is the version of this SDK itself.
-	SDKVersion = "0.4.2"
+	SDKVersion = "0.5.0"
 )
 
 // IsCompatible reports whether the given firmware protocol version string

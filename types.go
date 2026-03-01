@@ -43,6 +43,32 @@ type WifiStatus struct {
 	Clients int    `json:"clients"`
 }
 
+// DiagnosticsHeap describes per-region heap metrics returned by bramble.getDiagnostics.
+type DiagnosticsHeap struct {
+	InternalFree             float64 `json:"internal_free"`
+	InternalMinEverFree      float64 `json:"internal_min_ever_free"`
+	InternalLargestFreeBlock float64 `json:"internal_largest_free_block"`
+	DMAFree                  float64 `json:"dma_free"`
+	DMALargestFreeBlock      float64 `json:"dma_largest_free_block"`
+	PSRAMFree                float64 `json:"psram_free"`
+	PSRAMMinEverFree         float64 `json:"psram_min_ever_free"`
+}
+
+// TaskStackHWM is one task stack high-water-mark entry from bramble.getDiagnostics.
+type TaskStackHWM struct {
+	Task     string  `json:"task"`
+	HWMWords float64 `json:"hwm_words"`
+	HWMBytes float64 `json:"hwm_bytes"`
+}
+
+// DiagnosticsResponse is returned by bramble.getDiagnostics.
+type DiagnosticsResponse struct {
+	UptimeS      float64         `json:"uptime_s"`
+	FreeHeap     float64         `json:"free_heap"`
+	Heap         DiagnosticsHeap `json:"heap"`
+	TaskStackHWM []TaskStackHWM  `json:"task_stack_hwm"`
+}
+
 // IdentityResponse is returned by bramble.getIdentity.
 type IdentityResponse struct {
 	Address    string `json:"address"`
@@ -119,10 +145,10 @@ type Channel struct {
 
 // Message is a stored or incoming message.
 type Message struct {
-	From      string `json:"from"`
-	To        string `json:"to"`
-	Text      string `json:"text"`
-	Tier      string `json:"tier,omitempty"`
+	From string `json:"from"`
+	To   string `json:"to"`
+	Text string `json:"text"`
+	Tier string `json:"tier,omitempty"`
 	// Timestamp is seconds since epoch (firmware key: timestamp_s).
 	Timestamp int64  `json:"timestamp_s"`
 	MsgID     string `json:"msg_id,omitempty"`
@@ -267,7 +293,7 @@ type SendProbeResult struct {
 	// ProbeIDHex is the probe ID as a hex string (firmware key: probe_id).
 	ProbeIDHex string `json:"probe_id,omitempty"`
 	// AckWindow is the acknowledgment window in seconds (firmware key: ack_window).
-	AckWindow int `json:"ack_window,omitempty"`
+	AckWindow int  `json:"ack_window,omitempty"`
 	OK        bool `json:"ok,omitempty"`
 	// ProbeID is a convenience field parsed from ProbeIDHex by the client; not a JSON field.
 	ProbeID int `json:"-"`

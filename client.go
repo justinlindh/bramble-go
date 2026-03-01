@@ -177,6 +177,24 @@ func (c *Client) GetWifiStatus(ctx context.Context) (*WifiStatus, error) {
 	return &resp, nil
 }
 
+// GetDiagnostics returns runtime heap diagnostics and task stack high-water marks.
+func (c *Client) GetDiagnostics(ctx context.Context, includeHeapDump bool) (*DiagnosticsResponse, error) {
+	params := map[string]any{}
+	if includeHeapDump {
+		params["include_heap_dump"] = true
+	}
+
+	raw, err := c.proto.Call(ctx, "bramble.getDiagnostics", params)
+	if err != nil {
+		return nil, fmt.Errorf("bramble: get diagnostics: %w", err)
+	}
+	var resp DiagnosticsResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode DiagnosticsResponse: %w", err)
+	}
+	return &resp, nil
+}
+
 // Identity returns the node's address and public key hash.
 func (c *Client) Identity(ctx context.Context) (*IdentityResponse, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getIdentity", nil)

@@ -112,6 +112,64 @@ func TestClient_GetWifiStatus(t *testing.T) {
 	}
 }
 
+func TestClient_GetDiagnostics(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"uptime_s":1234,"free_heap":45678,"heap":{"internal_free":1000,"internal_min_ever_free":900,"internal_largest_free_block":700,"dma_free":600,"dma_largest_free_block":500,"psram_free":400,"psram_min_ever_free":300},"task_stack_hwm":[{"task":"main","hwm_words":128,"hwm_bytes":512}]}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	d, err := c.GetDiagnostics(ctx, true)
+	if err != nil {
+		t.Fatalf("GetDiagnostics error: %v", err)
+	}
+	if d.UptimeS != 1234 {
+		t.Fatalf("uptime_s: got %v, want 1234", d.UptimeS)
+	}
+	if d.Heap.InternalFree != 1000 {
+		t.Fatalf("heap.internal_free: got %v, want 1000", d.Heap.InternalFree)
+	}
+	if len(d.TaskStackHWM) != 1 || d.TaskStackHWM[0].Task != "main" {
+		t.Fatalf("task_stack_hwm decode failed: %+v", d.TaskStackHWM)
+	}
+
+	sent := mock.Sent()
+	if len(sent) != 1 {
+		t.Fatalf("expected 1 sent request, got %d", len(sent))
+	}
+	if !strings.Contains(sent[0], `"method":"bramble.getDiagnostics"`) {
+		t.Fatalf("expected bramble.getDiagnostics request, got: %s", sent[0])
+	}
+	if !strings.Contains(sent[0], `"include_heap_dump":true`) {
+		t.Fatalf("expected include_heap_dump=true in request, got: %s", sent[0])
+	}
+}
+
+func TestClient_GetDiagnostics_DefaultParamsEmptyObject(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"uptime_s":1,"free_heap":2,"heap":{"internal_free":3,"internal_min_ever_free":4,"internal_largest_free_block":5,"dma_free":6,"dma_largest_free_block":7,"psram_free":8,"psram_min_ever_free":9},"task_stack_hwm":[]}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	_, err := c.GetDiagnostics(ctx, false)
+	if err != nil {
+		t.Fatalf("GetDiagnostics error: %v", err)
+	}
+
+	sent := mock.Sent()
+	if len(sent) != 1 {
+		t.Fatalf("expected 1 sent request, got %d", len(sent))
+	}
+	if strings.Contains(sent[0], `"include_heap_dump"`) {
+		t.Fatalf("did not expect include_heap_dump in request when false: %s", sent[0])
+	}
+}
+
 func TestClient_Neighbors(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer c.Close()
