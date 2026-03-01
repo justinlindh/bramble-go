@@ -127,8 +127,10 @@ All methods accept a `context.Context` for timeout/cancellation.
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `Status(ctx)` | `*StatusResponse` | Address, firmware, peers, counters, uptime |
+| `GetWifiStatus(ctx)` | `*WifiStatus` | Wi-Fi mode/link/AP client status |
 | `Identity(ctx)` | `*IdentityResponse` | Address + public key hash |
 | `Version(ctx)` | `*VersionResponse` | Firmware/protocol version, hardware |
+| `DeliveryEvents(ctx, sinceEventSeq, limit)` | `*DeliveryReplayResponse` | Replay persisted delivery telemetry events |
 | `Neighbors(ctx)` | `[]Neighbor` | Direct radio neighbors (RSSI, SNR, last heard) |
 | `Routes(ctx)` | `[]Route` | Routing table entries |
 | `Airtime(ctx)` | `*AirtimeStats` | Per-tier airtime budget usage |
@@ -136,6 +138,8 @@ All methods accept a `context.Context` for timeout/cancellation.
 | `Messages(ctx)` | `[]Message` | Stored message history |
 | `PeerLocations(ctx)` | `[]LocationPeer` | Peer location data |
 | `Config(ctx)` | `*ConfigResponse` | Full node config (name, address, radio, channels) |
+| `GetTrafficDebug(ctx)` | `*GetTrafficDebugResponse` | Current traffic debug config and ring-buffer state |
+| `GetTrafficEvents(ctx, params)` | `*GetTrafficEventsResponse` | Pull traffic debug events from ring buffer |
 
 ### Action Methods
 
@@ -212,7 +216,7 @@ msg.ActionText() // "waves hello"
 
 ## Protocol Compatibility
 
-This SDK negotiates protocol versions on connect. See [VERSIONING.md](https://github.com/justinlindh/bramble/src/branch/feature/ws-sdk-cli/VERSIONING.md) for the compatibility matrix.
+This SDK negotiates protocol versions on connect. See [VERSIONING.md](https://github.com/justinlindh/bramble/src/branch/main/VERSIONING.md) for the compatibility matrix.
 
 ## Releases (semantic-release)
 
@@ -239,4 +243,4 @@ Examples:
 
 ## License
 
-TBD — see [VERSIONING.md](https://github.com/justinlindh/bramble/src/branch/feature/ws-sdk-cli/VERSIONING.md)
+TBD — see [VERSIONING.md](https://github.com/justinlindh/bramble/src/branch/main/VERSIONING.md)
