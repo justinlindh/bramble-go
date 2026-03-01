@@ -141,12 +141,27 @@ All methods accept a `context.Context` for timeout/cancellation.
 | `GetTrafficDebug(ctx)` | `*GetTrafficDebugResponse` | Current traffic debug config and ring-buffer state |
 | `GetTrafficEvents(ctx, params)` | `*GetTrafficEventsResponse` | Pull traffic debug events from ring buffer |
 
+#### Query Usage Examples
+
+```go
+wifi, _ := client.GetWifiStatus(ctx)
+fmt.Printf("wifi mode=%s ssid=%s ip=%s\n", wifi.Mode, wifi.SSID, wifi.IP)
+
+replay, _ := client.DeliveryEvents(ctx, 0, 100)
+fmt.Printf("delivery events replayed=%d\n", len(replay.Events))
+```
+
 ### Action Methods
 
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `Send(ctx, dest, text)` | `*SendResult` | Send unicast message |
-| `Broadcast(ctx, text)` | `*SendResult` | Broadcast to public channel |
+| `SendCritical(ctx, dest, text)` | `*SendResult` | Send critical-priority unicast message |
+| `SendBroadcast(ctx, text)` | `*SendResult` | Broadcast on the public channel |
+| `SendBroadcastCritical(ctx, text)` | `*SendResult` | Critical-priority broadcast on the public channel |
+| `Broadcast(ctx, text)` | `*SendResult` | Deprecated alias for `SendBroadcast` |
+| `BroadcastOnChannel(ctx, channel, text)` | `*SendResult` | Broadcast on a specific channel index |
+| `BroadcastOnChannelCritical(ctx, channel, text)` | `*SendResult` | Critical-priority broadcast on a specific channel |
 | `SendProbe(ctx)` | `*SendProbeResult` | Network reachability probe |
 | `SetRadio(ctx, config)` | `error` | Update radio parameters |
 | `SetNodeName(ctx, name)` | `error` | Set node display name (max 32 chars) |
@@ -159,8 +174,46 @@ All methods accept a `context.Context` for timeout/cancellation.
 | `RemoveLocationContact(ctx, addr)` | `error` | Stop sharing location |
 | `ShareLocationOnce(ctx, addr)` | `error` | One-shot location share |
 | `Reboot(ctx)` | `error` | Reboot node |
+| `OTAUpdate(ctx, url)` | `*OTAUpdateResponse` | Trigger OTA update from firmware URL |
+| `SetTrafficDebug(ctx, params)` | `*SetTrafficDebugResponse` | Configure traffic debug telemetry capture |
+
+#### Action/Debug Usage Examples
+
+```go
+// Critical unicast
+_, _ = client.SendCritical(ctx, 0xAABBCCDD, "priority ping")
+
+// Channel-targeted broadcast (channel index 2)
+_, _ = client.BroadcastOnChannel(ctx, 2, "ops update")
+
+// OTA update
+ota, _ := client.OTAUpdate(ctx, "https://example.com/bramble.bin")
+fmt.Println("ota scheduled:", ota.OK)
+
+// Traffic debug pull flow
+enabled := true
+sample := 100
+_, _ = client.SetTrafficDebug(ctx, bramble.SetTrafficDebugParams{Enabled: &enabled, SampleRate: &sample})
+state, _ := client.GetTrafficDebug(ctx)
+fmt.Println("traffic debug enabled:", state.Enabled)
+events, _ := client.GetTrafficEvents(ctx, bramble.GetTrafficEventsParams{})
+fmt.Println("events:", events.Returned)
+```
 
 ### Notification Callbacks
+
+| Method | Callback Signature | Description |
+|--------|--------------------|-------------|
+| `OnMessage(fn)` | `func(Message)` | Incoming message notifications |
+| `OnAck(fn)` | `func(Ack)` | Message ACK/delivery status notifications |
+| `OnNeighborChange(fn)` | `func()` | Neighbor table change notification |
+| `OnProbeResult(fn)` | `func(ProbeResult)` | Per-peer probe result notifications |
+| `OnProbeComplete(fn)` | `func(ProbeComplete)` | Probe completion summary notification |
+| `OnTrafficEvent(fn)` | `func(TrafficEvent)` | Real-time traffic debug event notifications |
+| `OnBroadcastDelivery(fn)` | `func(BroadcastDelivery)` | Broadcast delivery telemetry notifications |
+| `OnWifiEvent(fn)` | `func(WifiEvent)` | Wi-Fi state change notifications |
+| `OnGpsEvent(fn)` | `func(GpsEvent)` | GPS state/position notifications |
+| `OnLocationEvent(fn)` | `func(LocationEvent)` | Location sharing event notifications |
 
 ```go
 client.OnMessage(func(m bramble.Message) {
@@ -168,11 +221,15 @@ client.OnMessage(func(m bramble.Message) {
 })
 
 client.OnAck(func(a bramble.Ack) {
-    fmt.Printf("Packet %d: %s\n", a.PacketID, a.Status)
+    fmt.Printf("Packet %s: %s\n", a.PacketID, a.Status)
 })
 
-client.OnNeighborChange(func() {
-    fmt.Println("Neighbor table changed")
+client.OnProbeResult(func(p bramble.ProbeResult) {
+    fmt.Printf("Probe %s reached %s in %dms\n", p.ProbeID, p.Address, p.LatencyMs)
+})
+
+client.OnTrafficEvent(func(e bramble.TrafficEvent) {
+    fmt.Printf("Traffic seq=%d tx=%t len=%d category=%s\n", e.Seq, e.IsTx, e.PacketLen, e.Category)
 })
 ```
 
@@ -190,7 +247,16 @@ type Neighbor struct {
 }
 
 type SendResult struct {
-    MessageID, Status string
+    MessageID      string
+    PacketID       string
+    BroadcastID    string
+    Status         string
+    Fragmented     bool
+    FragmentsTotal int
+    MaxBytes       int
+    ActualBytes    int
+    Broadcast      bool
+    Channel        int
 }
 
 type ConfigResponse struct {
