@@ -8,11 +8,6 @@ Go SDK for [Bramble](https://github.com/justinlindh/bramble) LoRa mesh nodes. Co
 go get github.com/justinlindh/bramble-go
 ```
 
-> **Private module note:** This module is hosted on a private Gitea instance. You'll need SSH access to `192.0.2.0:2222` and a `replace` directive in your `go.mod` pointing to a local checkout, or configure `GONOSUMCHECK` and `GOPRIVATE`:
-> ```bash
-> export GOPRIVATE=github.com/*
-> ```
-
 ## Quick Start
 
 ```go
@@ -309,4 +304,4 @@ Examples:
 
 ## License
 
-TBD — see [VERSIONING.md](https://github.com/justinlindh/bramble/src/branch/main/VERSIONING.md)
+MIT — see [LICENSE](LICENSE)
