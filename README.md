@@ -1,11 +1,11 @@
 # bramble-go
 
-Go SDK for [Bramble](https://github.com/justinlindh/bramble) LoRa mesh nodes. Communicates via JSON-RPC 2.0 over Serial, WebSocket, or BLE (Nordic UART Service).
+Go SDK for [Bramble](https://github.com/YOUR-ORG/bramble) LoRa mesh nodes. Communicates via JSON-RPC 2.0 over Serial, WebSocket, or BLE (Nordic UART Service).
 
 ## Install
 
 ```bash
-go get github.com/justinlindh/bramble-go
+go get github.com/YOUR-ORG/bramble-go
 ```
 
 ## Quick Start
@@ -19,8 +19,8 @@ import (
     "log"
     "time"
 
-    bramble "github.com/justinlindh/bramble-go"
-    "github.com/justinlindh/bramble-go/transport"
+    bramble "github.com/YOUR-ORG/bramble-go"
+    "github.com/YOUR-ORG/bramble-go/transport"
 )
 
 func main() {
@@ -277,7 +277,7 @@ msg.ActionText() // "waves hello"
 
 ## Protocol Compatibility
 
-This SDK negotiates protocol versions on connect. See [VERSIONING.md](https://github.com/justinlindh/bramble/src/branch/main/VERSIONING.md) for the compatibility matrix.
+This SDK negotiates protocol versions on connect. See [VERSIONING.md](https://github.com/YOUR-ORG/bramble/src/branch/main/VERSIONING.md) for the compatibility matrix.
 
 ## Releases (semantic-release)
 
@@ -286,7 +286,7 @@ Releases are automated from `main` using semantic-release and Conventional Commi
 ### Required Gitea Actions secrets
 
 - `GITEA_TOKEN` (**required**): Personal Access Token with repository write/release permissions.
-- `GITEA_URL` (optional): Base URL of the Gitea instance. Defaults to `https://github.com`.
+- `GITEA_URL` (optional): Base URL of the Gitea instance. Defaults to `https://github.com/YOUR-ORG`.
 
 ### Commit format
 
