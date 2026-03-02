@@ -1,1 +1,27 @@
+# Go coverage / test artifacts
 cover.out
+coverage.out
+*.coverprofile
+coverage/
+
+# Go build artifacts
+bin/
+dist/
+build/
+out/
+*.test
+*.prof
+*.pprof
+
+# Dependencies
+vendor/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.log
