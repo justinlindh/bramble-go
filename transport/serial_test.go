@@ -129,3 +129,11 @@ func TestSerialReceiveContextCancel(t *testing.T) {
 		t.Fatalf("expected context.Canceled, got %v", err)
 	}
 }
+
+func TestBuildAuthRequest(t *testing.T) {
+	got := string(buildAuthRequest("abc123"))
+	want := `{"jsonrpc":"2.0","method":"bramble.auth","params":{"token":"abc123"},"id":0}`
+	if got != want {
+		t.Fatalf("unexpected auth request.\nwant: %s\n got: %s", want, got)
+	}
+}

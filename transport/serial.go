@@ -28,6 +28,13 @@ func WithBaudRate(baud int) SerialOption {
 	}
 }
 
+// WithAuthToken sets an auth token used for bramble.auth after connect.
+func WithAuthToken(token string) SerialOption {
+	return func(s *Serial) {
+		s.AuthToken = token
+	}
+}
+
 // Serial is a Transport that communicates with a Bramble node over a UART/serial port.
 // Messages are newline-delimited JSON. Lines not starting with '{' (e.g., ESP-IDF log
 // output and console prompts) are skipped transparently.
@@ -36,15 +43,16 @@ func WithBaudRate(baud int) SerialOption {
 // attempt to reconnect using exponential backoff (1s, 2s, 4s, 8s, … up to 30s).
 // During reconnection, Send returns ErrReconnecting.
 type Serial struct {
-	port    string
-	baud    int
-	mu      sync.Mutex
-	conn    serial.Port
-	scanner *bufio.Scanner
-	recvCh  chan []byte
-	errCh   chan error
-	done    chan struct{}
-	once    sync.Once
+	port      string
+	baud      int
+	AuthToken string
+	mu        sync.Mutex
+	conn      serial.Port
+	scanner   *bufio.Scanner
+	recvCh    chan []byte
+	errCh     chan error
+	done      chan struct{}
+	once      sync.Once
 
 	// reconnecting is true while a reconnect attempt is in progress.
 	reconnecting bool
@@ -91,8 +99,57 @@ func (s *Serial) Connect(_ context.Context) error {
 	s.conn = conn
 	s.scanner = bufio.NewScanner(conn)
 
+	if err := s.authenticate(); err != nil {
+		_ = conn.Close()
+		s.conn = nil
+		return err
+	}
+
 	go s.reader()
 	return nil
+}
+
+func (s *Serial) authenticate() error {
+	if s.AuthToken == "" {
+		return nil
+	}
+
+	if err := s.sendAuth(); err != nil {
+		return err
+	}
+	return s.readAuthResponse()
+}
+
+func (s *Serial) sendAuth() error {
+	msg := append(buildAuthRequest(s.AuthToken), '\n')
+	_, err := s.conn.Write(msg)
+	if err != nil {
+		return fmt.Errorf("bramble/transport/serial: auth write: %w", err)
+	}
+	return nil
+}
+
+func (s *Serial) readAuthResponse() error {
+	deadlineConn, ok := s.conn.(interface{ SetReadDeadline(time.Time) error })
+	if ok {
+		_ = deadlineConn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		defer func() { _ = deadlineConn.SetReadDeadline(time.Time{}) }()
+	}
+
+	for s.scanner.Scan() {
+		line := strings.TrimSpace(s.scanner.Text())
+		if !strings.HasPrefix(line, "{") {
+			continue
+		}
+		if err := validateAuthResponse([]byte(line)); err != nil {
+			return fmt.Errorf("bramble/transport/serial: auth validate: %w", err)
+		}
+		return nil
+	}
+	if err := s.scanner.Err(); err != nil {
+		return fmt.Errorf("bramble/transport/serial: auth read: %w", err)
+	}
+	return fmt.Errorf("bramble/transport/serial: auth read: empty response")
 }
 
 // reader is the background goroutine that reads lines from the serial port.
@@ -198,14 +255,25 @@ func (s *Serial) reconnect() error {
 			s.mu.Lock()
 			s.conn = conn
 			s.scanner = bufio.NewScanner(conn)
-			s.reconnecting = false
-			onReconnect := s.OnReconnect
 			s.mu.Unlock()
 
-			if onReconnect != nil {
-				onReconnect()
+			if err := s.authenticate(); err != nil {
+				_ = conn.Close()
+				s.mu.Lock()
+				s.conn = nil
+				s.scanner = nil
+				s.mu.Unlock()
+			} else {
+				s.mu.Lock()
+				s.reconnecting = false
+				onReconnect := s.OnReconnect
+				s.mu.Unlock()
+
+				if onReconnect != nil {
+					onReconnect()
+				}
+				return nil
 			}
-			return nil
 		}
 
 		delay *= 2
