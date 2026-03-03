@@ -59,3 +59,12 @@ func TestBLEInfo(t *testing.T) {
 		t.Fatalf("unexpected info with name: %q", got)
 	}
 }
+
+func TestValidateAuthResponse(t *testing.T) {
+	if err := validateAuthResponse([]byte(`{"jsonrpc":"2.0","id":0,"result":{"ok":true}}`)); err != nil {
+		t.Fatalf("expected valid auth response, got %v", err)
+	}
+	if err := validateAuthResponse([]byte(`{"jsonrpc":"2.0","id":0,"error":{"code":-32001,"message":"unauthorized"}}`)); err == nil {
+		t.Fatal("expected auth error response to fail")
+	}
+}

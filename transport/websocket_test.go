@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -113,6 +114,29 @@ func TestWebSocketConnectInitialDialSuccess(t *testing.T) {
 		t.Fatalf("Connect: %v", err)
 	}
 	defer w.Close()
+}
+
+func TestWebSocketConnectSetsAuthorizationHeader(t *testing.T) {
+	origDial := websocketDialFunc
+	defer func() { websocketDialFunc = origDial }()
+
+	var gotAuth string
+	websocketDialFunc = func(ctx context.Context, u string, opts *websocket.DialOptions) (*websocket.Conn, *http.Response, error) {
+		if opts != nil && opts.HTTPHeader != nil {
+			gotAuth = opts.HTTPHeader.Get("Authorization")
+		}
+		return nil, nil, errors.New("expected dial failure")
+	}
+
+	w := NewWebSocket("ws://example.invalid")
+	w.AuthToken = "secret-token"
+	err := w.Connect(context.Background())
+	if err == nil {
+		t.Fatal("expected Connect error")
+	}
+	if !strings.Contains(gotAuth, "Bearer secret-token") {
+		t.Fatalf("expected Authorization header to include bearer token, got %q", gotAuth)
+	}
 }
 
 func TestWebSocketConnectInvalidURL(t *testing.T) {

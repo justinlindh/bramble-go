@@ -29,6 +29,7 @@ var (
 
 // BLEConfig holds configuration for a BLE transport connection.
 type BLEConfig struct {
+	AuthConfig
 	// DeviceName to scan for (e.g. "Bramble"). Empty = connect to first NUS device.
 	DeviceName string
 	// ScanTimeout is how long to scan before giving up. Default: 10s.
@@ -159,10 +160,39 @@ func (b *BLE) Connect(ctx context.Context) error {
 
 	b.connected = true
 	b.closeCh = make(chan struct{})
+
+	if err := b.authenticate(ctx); err != nil {
+		_ = device.Disconnect()
+		b.connected = false
+		return err
+	}
+
 	return nil
 }
 
 // onNotification handles incoming BLE data and assembles newline-delimited JSON lines.
+func (b *BLE) authenticate(ctx context.Context) error {
+	if b.cfg.AuthToken == "" {
+		return nil
+	}
+
+	if err := b.Send(buildAuthRequest(b.cfg.AuthToken)); err != nil {
+		return fmt.Errorf("bramble/transport/ble: auth write: %w", err)
+	}
+
+	authCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	resp, err := b.Receive(authCtx)
+	if err != nil {
+		return fmt.Errorf("bramble/transport/ble: auth receive: %w", err)
+	}
+	if err := validateAuthResponse(resp); err != nil {
+		return fmt.Errorf("bramble/transport/ble: auth validate: %w", err)
+	}
+	return nil
+}
+
 func (b *BLE) onNotification(data []byte) {
 	for _, ch := range data {
 		if ch == '\n' {

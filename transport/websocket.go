@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -21,11 +22,12 @@ var (
 // using exponential backoff (1s, 2s, 4s, 8s, … up to 30s). During reconnection, Send
 // returns ErrReconnecting. The Receive loop detects disconnects and drives reconnection.
 type WebSocket struct {
-	url  string
-	mu   sync.Mutex
-	conn *websocket.Conn
-	done chan struct{}
-	once sync.Once
+	url       string
+	AuthToken string
+	mu        sync.Mutex
+	conn      *websocket.Conn
+	done      chan struct{}
+	once      sync.Once
 
 	// reconnecting is true while a reconnect attempt is in progress.
 	reconnecting bool
@@ -51,7 +53,7 @@ func (w *WebSocket) Connect(ctx context.Context) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 
-	conn, _, err := websocketDialFunc(ctx, w.url, nil)
+	conn, _, err := websocketDialFunc(ctx, w.url, w.dialOptions())
 	if err != nil {
 		return fmt.Errorf("bramble/transport/websocket: dial %s: %w", w.url, err)
 	}
@@ -149,7 +151,7 @@ func (w *WebSocket) reconnect() error {
 		websocketSleep(delay)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		conn, _, err := websocketDialFunc(ctx, w.url, nil)
+		conn, _, err := websocketDialFunc(ctx, w.url, w.dialOptions())
 		cancel()
 
 		if err == nil {
@@ -171,6 +173,16 @@ func (w *WebSocket) reconnect() error {
 			delay = maxDelay
 		}
 	}
+}
+
+func (w *WebSocket) dialOptions() *websocket.DialOptions {
+	if w.AuthToken == "" {
+		return nil
+	}
+
+	headers := make(http.Header)
+	headers.Set("Authorization", "Bearer "+w.AuthToken)
+	return &websocket.DialOptions{HTTPHeader: headers}
 }
 
 // Close sends a WebSocket close frame and closes the connection.
