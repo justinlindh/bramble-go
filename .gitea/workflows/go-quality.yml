@@ -125,13 +125,13 @@ jobs:
             ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-
             ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-
 
-      - name: Setup golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.62.2
-          skip-cache: false
-          skip-save-cache: false
-          args: --timeout=5m
+      - name: Install golangci-lint
+        run: |
+          mkdir -p "$HOME/go/bin"
+          GOBIN="$HOME/go/bin" go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2
+
+      - name: Run golangci-lint
+        run: $HOME/go/bin/golangci-lint run --timeout=5m
 
       - name: Save Go and lint caches
         if: ${{ always() }}
