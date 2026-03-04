@@ -5,10 +5,20 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Run semantic-release in dry-run mode (no tags/releases)
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   semantic-release:
-    runs-on: ubuntu-latest
+    # Gitea runners in this environment use "linux" labels.
+    runs-on: linux
+    timeout-minutes: 20
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,6 +29,24 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - name: Validate release prerequisites
+        env:
+          GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
+          GITEA_URL: ${{ secrets.GITEA_URL }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GITEA_TOKEN:-}" ]; then
+            echo "ERROR: Missing required secret GITEA_TOKEN." >&2
+            echo "Create a Gitea Actions secret named GITEA_TOKEN with repo write + release permissions." >&2
+            exit 1
+          fi
+
+          if [ -n "${GITEA_URL:-}" ] && ! echo "$GITEA_URL" | grep -Eq '^https?://'; then
+            echo "ERROR: GITEA_URL must be an http(s) base URL (example: https://git.example.com)." >&2
+            exit 1
+          fi
 
       - name: Install semantic-release dependencies
         run: |
@@ -32,4 +60,15 @@ jobs:
         env:
           GITEA_TOKEN: ${{ secrets.GITEA_TOKEN }}
           GITEA_URL: ${{ secrets.GITEA_URL }}
-        run: npx semantic-release
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          dry_flag=""
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "${INPUT_DRY_RUN:-false}" = "true" ]; then
+            echo "Running semantic-release in --dry-run mode (manual dispatch input dry_run=true)."
+            dry_flag="--dry-run"
+          fi
+
+          npx semantic-release $dry_flag
