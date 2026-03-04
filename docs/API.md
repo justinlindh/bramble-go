@@ -24,6 +24,7 @@ All methods accept a `context.Context` for timeout/cancellation.
 |--------|---------|-------------|
 | `Status(ctx)` | `*StatusResponse` | Address, firmware, peers, counters, uptime |
 | `GetWifiStatus(ctx)` | `*WifiStatus` | Wi-Fi mode/link/AP client status |
+| `GetDiagnostics(ctx, includeHeapDump)` | `*DiagnosticsResponse` | Runtime heap and task stack diagnostics |
 | `Identity(ctx)` | `*IdentityResponse` | Address + public key hash |
 | `Version(ctx)` | `*VersionResponse` | Firmware/protocol version, hardware |
 | `DeliveryEvents(ctx, sinceEventSeq, limit)` | `*DeliveryReplayResponse` | Replay persisted delivery telemetry events |
