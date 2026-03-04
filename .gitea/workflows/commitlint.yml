@@ -8,7 +8,8 @@ on:
 
 jobs:
   commitlint:
-    runs-on: ubuntu-latest
+    runs-on: linux
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,9 +25,18 @@ jobs:
         run: npm install --no-save @commitlint/cli@19 @commitlint/config-conventional@19
 
       - name: Validate commit messages
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          PUSH_SHA: ${{ github.sha }}
         run: |
-          if [ "${{ gitea.event_name }}" = "pull_request" ]; then
-            npx commitlint --from "${{ gitea.event.pull_request.base.sha }}" --to "${{ gitea.event.pull_request.head.sha }}" --verbose
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            npx commitlint --from "$PR_BASE_SHA" --to "$PR_HEAD_SHA" --verbose
+          elif [ "$PUSH_BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            npx commitlint --last --verbose
           else
-            npx commitlint --from "${{ gitea.before }}" --to "${{ gitea.sha }}" --verbose
+            npx commitlint --from "$PUSH_BEFORE_SHA" --to "$PUSH_SHA" --verbose
           fi
