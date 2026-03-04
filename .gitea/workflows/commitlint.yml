@@ -49,9 +49,9 @@ jobs:
           export PATH="$TOOLS_DIR/node_modules/.bin:$PATH"
           export NODE_PATH="$TOOLS_DIR/node_modules"
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            commitlint --config .commitlintrc.cjs --from "$PR_BASE_SHA" --to "$PR_HEAD_SHA" --verbose
+            commitlint --from "$PR_BASE_SHA" --to "$PR_HEAD_SHA" --verbose
           elif [ "$PUSH_BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
-            commitlint --config .commitlintrc.cjs --last --verbose
+            commitlint --last --verbose
           else
-            commitlint --config .commitlintrc.cjs --from "$PUSH_BEFORE_SHA" --to "$PUSH_SHA" --verbose
+            commitlint --from "$PUSH_BEFORE_SHA" --to "$PUSH_SHA" --verbose
           fi
