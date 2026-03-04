@@ -6,6 +6,10 @@ on:
     branches:
       - main
 
+env:
+  NODE_VERSION: '20'
+  COMMITLINT_VERSION: '19'
+
 jobs:
   commitlint:
     runs-on: linux
@@ -19,10 +23,18 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install commitlint
-        run: npm install --no-save @commitlint/cli@19 @commitlint/config-conventional@19
+      - name: Install commitlint (pinned, cached on runner)
+        run: |
+          set -euo pipefail
+          TOOLS_DIR="$HOME/.cache/bramble-go/commitlint-tools"
+          mkdir -p "$TOOLS_DIR"
+          if [ ! -x "$TOOLS_DIR/node_modules/.bin/commitlint" ]; then
+            npm install --prefix "$TOOLS_DIR" --no-save \
+              "@commitlint/cli@${COMMITLINT_VERSION}" \
+              "@commitlint/config-conventional@${COMMITLINT_VERSION}"
+          fi
 
       - name: Validate commit messages
         env:
@@ -33,10 +45,13 @@ jobs:
           PUSH_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
+          export TOOLS_DIR="$HOME/.cache/bramble-go/commitlint-tools"
+          export PATH="$TOOLS_DIR/node_modules/.bin:$PATH"
+          export NODE_PATH="$TOOLS_DIR/node_modules"
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            npx commitlint --from "$PR_BASE_SHA" --to "$PR_HEAD_SHA" --verbose
+            commitlint --from "$PR_BASE_SHA" --to "$PR_HEAD_SHA" --verbose
           elif [ "$PUSH_BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
-            npx commitlint --last --verbose
+            commitlint --last --verbose
           else
-            npx commitlint --from "$PUSH_BEFORE_SHA" --to "$PUSH_SHA" --verbose
+            commitlint --from "$PUSH_BEFORE_SHA" --to "$PUSH_SHA" --verbose
           fi

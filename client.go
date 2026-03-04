@@ -444,8 +444,9 @@ func (c *Client) SendProbe(ctx context.Context) (*SendProbeResult, error) {
 		return nil, fmt.Errorf("bramble: decode SendProbeResult: %w", err)
 	}
 	if resp.ProbeID == 0 && resp.ProbeIDHex != "" {
-		if v, perr := fmt.Sscanf(resp.ProbeIDHex, "%x", &resp.ProbeID); perr != nil || v != 1 {
-			// keep hex-only when parse fails
+		var parsed int
+		if _, perr := fmt.Sscanf(resp.ProbeIDHex, "%x", &parsed); perr == nil {
+			resp.ProbeID = parsed
 		}
 	}
 	return &resp, nil

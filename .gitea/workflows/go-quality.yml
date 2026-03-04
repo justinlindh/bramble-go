@@ -1,0 +1,122 @@
+name: Go Quality
+
+on:
+  pull_request:
+    paths:
+      - '**/*.go'
+      - go.mod
+      - go.sum
+      - .golangci.yml
+      - .gitea/workflows/go-quality.yml
+  push:
+    branches:
+      - main
+    paths:
+      - '**/*.go'
+      - go.mod
+      - go.sum
+      - .golangci.yml
+      - .gitea/workflows/go-quality.yml
+
+env:
+  GOMODCACHE: /home/runner/.cache/bramble-go/go/pkg/mod
+  GOCACHE: /home/runner/.cache/bramble-go/go-build
+
+jobs:
+  test:
+    name: go test
+    runs-on: linux
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Prewarm module cache
+        run: |
+          mkdir -p "$GOMODCACHE" "$GOCACHE"
+          go mod download
+
+      - name: Run tests
+        run: go test ./...
+
+  vet:
+    name: go vet
+    runs-on: linux
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Prewarm module cache
+        run: |
+          mkdir -p "$GOMODCACHE" "$GOCACHE"
+          go mod download
+
+      - name: Run vet
+        run: go vet ./...
+
+  lint:
+    name: golangci-lint
+    runs-on: linux
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Prewarm module cache
+        run: |
+          mkdir -p "$GOMODCACHE" "$GOCACHE"
+          go mod download
+
+      - name: Install golangci-lint (runner-built)
+        run: |
+          set -euo pipefail
+          GOBIN="$HOME/.cache/bramble-go/go-tools/bin"
+          mkdir -p "$GOBIN"
+          if [ ! -x "$GOBIN/golangci-lint" ]; then
+            GOBIN="$GOBIN" go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+          fi
+
+      - name: Run golangci-lint
+        run: |
+          "$HOME/.cache/bramble-go/go-tools/bin/golangci-lint" run --timeout=5m
+
+  build:
+    name: go build
+    runs-on: linux
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - name: Prewarm module cache
+        run: |
+          mkdir -p "$GOMODCACHE" "$GOCACHE"
+          go mod download
+
+      - name: Build all packages
+        run: go build ./...

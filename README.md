@@ -12,6 +12,7 @@ Go SDK for [Bramble](https://github.com/justinlindh/bramble) LoRa mesh nodes. It
   - [BLE Notes](#ble-notes)
 - [API Overview](#api-overview)
 - [Protocol Compatibility](#protocol-compatibility)
+- [CI Parity (Local Quality Contract)](#ci-parity-local-quality-contract)
 - [Releases (semantic-release)](#releases-semantic-release)
 - [License](#license)
 
@@ -123,6 +124,34 @@ See the full API reference in [docs/API.md](docs/API.md).
 ## Protocol Compatibility
 
 This SDK negotiates protocol versions on connect. See [VERSIONING.md](https://github.com/justinlindh/bramble/src/branch/main/VERSIONING.md) for the compatibility matrix.
+
+## CI Parity (Local Quality Contract)
+
+Use this exact command set locally to match CI quality gates:
+
+```bash
+go test ./...
+go vet ./...
+golangci-lint run
+go build ./...
+```
+
+### golangci-lint install/version contract
+
+`golangci-lint` is expected at `$(go env GOPATH)/bin/golangci-lint` and pinned to `v1.64.8` for CI parity.
+
+Install locally:
+
+```bash
+curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh \
+  | sh -s -- -b "$(go env GOPATH)/bin" v1.64.8
+```
+
+If `$(go env GOPATH)/bin` is not on your `PATH`, run lint with:
+
+```bash
+"$(go env GOPATH)/bin/golangci-lint" run
+```
 
 ## Releases (semantic-release)
 
