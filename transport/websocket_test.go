@@ -1,3 +1,4 @@
+//nolint:staticcheck // SA1019: tests intentionally exercise legacy nhooyr/websocket API used by production transport until migration is completed.
 package transport
 
 import (

@@ -11,7 +11,6 @@ import (
 // Responses are queued via QueueResponse and delivered in FIFO order.
 type MockTransport struct {
 	mu        sync.Mutex
-	responses [][]byte
 	sent      [][]byte
 	connected bool
 	recvCh    chan []byte

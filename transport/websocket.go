@@ -1,3 +1,4 @@
+//nolint:staticcheck // SA1019: nhooyr/websocket is currently required for transport compatibility; migration to coder/websocket tracked separately.
 package transport
 
 import (
