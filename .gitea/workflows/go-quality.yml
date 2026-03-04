@@ -86,14 +86,18 @@ jobs:
           mkdir -p "$GOMODCACHE" "$GOCACHE"
           go mod download
 
-      - name: Setup golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: v1.64.8
-          install-mode: goinstall
-          skip-cache: false
-          skip-save-cache: false
-          args: --timeout=5m
+      - name: Install golangci-lint (runner-built)
+        run: |
+          set -euo pipefail
+          GOBIN="$HOME/.cache/bramble-go/go-tools/bin"
+          mkdir -p "$GOBIN"
+          if [ ! -x "$GOBIN/golangci-lint" ]; then
+            GOBIN="$GOBIN" go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+          fi
+
+      - name: Run golangci-lint
+        run: |
+          "$HOME/.cache/bramble-go/go-tools/bin/golangci-lint" run --timeout=5m
 
   build:
     name: go build
