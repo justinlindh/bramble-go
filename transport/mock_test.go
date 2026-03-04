@@ -101,3 +101,10 @@ func TestMockTransportInfoAndMockError(t *testing.T) {
 		t.Fatalf("expected wrapped sentinel error, got %v", err)
 	}
 }
+
+// intentional CI gate test: this should trigger ineffassign in golangci-lint.
+func TestIntentionalLintGateProbe(t *testing.T) {
+	x := 1
+	x = 2
+	_ = x
+}
