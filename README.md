@@ -128,10 +128,16 @@ This SDK negotiates protocol versions on connect. See [VERSIONING.md](https://gi
 
 Releases are automated from `main` using semantic-release and Conventional Commits.
 
+### Release workflow prerequisites
+
+- Runner label: release job targets `runs-on: linux` (self-hosted Gitea runner label in this environment).
+- Default trigger: pushes to `main`.
+- Manual trigger: `workflow_dispatch` with optional `dry_run=true` to validate release behavior without publishing tags/releases.
+
 ### Required Gitea Actions secrets
 
-- `GITEA_TOKEN` (required): Personal Access Token with repository write/release permissions.
-- `GITEA_URL` (optional): Base URL of your Gitea instance. Defaults to `https://github.com`.
+- `GITEA_TOKEN` (required): Personal Access Token with repository write/release permissions. The workflow fails fast with a clear error if this secret is missing.
+- `GITEA_URL` (optional): Base URL of your Gitea instance. Defaults to `https://github.com`; if set, it must be an `http(s)` URL.
 
 ### Commit format
 
