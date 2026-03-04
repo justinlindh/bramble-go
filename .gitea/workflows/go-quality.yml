@@ -19,7 +19,8 @@ on:
       - .gitea/workflows/go-quality.yml
 
 env:
-  GO_CACHE_PREFIX: go-quality-v1
+  GOMODCACHE: /home/runner/.cache/bramble-go/go/pkg/mod
+  GOCACHE: /home/runner/.cache/bramble-go/go-build
 
 jobs:
   test:
@@ -36,29 +37,13 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      - name: Restore Go caches
-        id: go-cache-restore
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-${{ hashFiles('.gitea/workflows/go-quality.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-
-            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-
+      - name: Prewarm module cache
+        run: |
+          mkdir -p "$GOMODCACHE" "$GOCACHE"
+          go mod download
 
       - name: Run tests
         run: go test ./...
-
-      - name: Save Go caches
-        if: ${{ always() }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ steps.go-cache-restore.outputs.cache-primary-key }}
 
   vet:
     name: go vet
@@ -74,29 +59,13 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      - name: Restore Go caches
-        id: go-cache-restore
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-${{ hashFiles('.gitea/workflows/go-quality.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-
-            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-
+      - name: Prewarm module cache
+        run: |
+          mkdir -p "$GOMODCACHE" "$GOCACHE"
+          go mod download
 
       - name: Run vet
         run: go vet ./...
-
-      - name: Save Go caches
-        if: ${{ always() }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ steps.go-cache-restore.outputs.cache-primary-key }}
 
   lint:
     name: golangci-lint
@@ -112,36 +81,18 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      - name: Restore Go and lint caches
-        id: go-cache-restore
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-            ~/.cache/golangci-lint
-          key: ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-${{ hashFiles('.gitea/workflows/go-quality.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-
-            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-
-
-      - name: Install golangci-lint
+      - name: Prewarm module cache
         run: |
-          mkdir -p "$HOME/go/bin"
-          GOBIN="$HOME/go/bin" go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2
+          mkdir -p "$GOMODCACHE" "$GOCACHE"
+          go mod download
 
-      - name: Run golangci-lint
-        run: $HOME/go/bin/golangci-lint run --timeout=5m
-
-      - name: Save Go and lint caches
-        if: ${{ always() }}
-        uses: actions/cache/save@v4
+      - name: Setup golangci-lint
+        uses: golangci/golangci-lint-action@v6
         with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-            ~/.cache/golangci-lint
-          key: ${{ steps.go-cache-restore.outputs.cache-primary-key }}
+          version: v1.62.2
+          skip-cache: false
+          skip-save-cache: false
+          args: --timeout=5m
 
   build:
     name: go build
@@ -157,26 +108,10 @@ jobs:
           go-version-file: go.mod
           cache: false
 
-      - name: Restore Go caches
-        id: go-cache-restore
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-${{ hashFiles('.gitea/workflows/go-quality.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-
-            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-
+      - name: Prewarm module cache
+        run: |
+          mkdir -p "$GOMODCACHE" "$GOCACHE"
+          go mod download
 
       - name: Build all packages
         run: go build ./...
-
-      - name: Save Go caches
-        if: ${{ always() }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ~/go/pkg/mod
-            ~/.cache/go-build
-          key: ${{ steps.go-cache-restore.outputs.cache-primary-key }}

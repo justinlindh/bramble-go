@@ -9,7 +9,6 @@ on:
 env:
   NODE_VERSION: '20'
   COMMITLINT_VERSION: '19'
-  COMMITLINT_CACHE_PREFIX: commitlint-tools-v1
 
 jobs:
   commitlint:
@@ -26,26 +25,16 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Restore npm + commitlint tools cache
-        id: commitlint-cache-restore
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.npm
-            ~/.cache/bramble-go/commitlint-tools
-          key: ${{ runner.os }}-${{ env.COMMITLINT_CACHE_PREFIX }}-node${{ env.NODE_VERSION }}-cli${{ env.COMMITLINT_VERSION }}-${{ hashFiles('.gitea/workflows/commitlint.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ env.COMMITLINT_CACHE_PREFIX }}-node${{ env.NODE_VERSION }}-cli${{ env.COMMITLINT_VERSION }}-
-            ${{ runner.os }}-${{ env.COMMITLINT_CACHE_PREFIX }}-node${{ env.NODE_VERSION }}-
-
-      - name: Install commitlint
+      - name: Install commitlint (pinned, cached on runner)
         run: |
           set -euo pipefail
           TOOLS_DIR="$HOME/.cache/bramble-go/commitlint-tools"
           mkdir -p "$TOOLS_DIR"
-          npm install --prefix "$TOOLS_DIR" --no-save \
-            "@commitlint/cli@${COMMITLINT_VERSION}" \
-            "@commitlint/config-conventional@${COMMITLINT_VERSION}"
+          if [ ! -x "$TOOLS_DIR/node_modules/.bin/commitlint" ]; then
+            npm install --prefix "$TOOLS_DIR" --no-save \
+              "@commitlint/cli@${COMMITLINT_VERSION}" \
+              "@commitlint/config-conventional@${COMMITLINT_VERSION}"
+          fi
 
       - name: Validate commit messages
         env:
@@ -56,20 +45,13 @@ jobs:
           PUSH_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          export PATH="$HOME/.cache/bramble-go/commitlint-tools/node_modules/.bin:$PATH"
+          export TOOLS_DIR="$HOME/.cache/bramble-go/commitlint-tools"
+          export PATH="$TOOLS_DIR/node_modules/.bin:$PATH"
+          export NODE_PATH="$TOOLS_DIR/node_modules"
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            commitlint --from "$PR_BASE_SHA" --to "$PR_HEAD_SHA" --verbose
+            commitlint --config .commitlintrc.cjs --from "$PR_BASE_SHA" --to "$PR_HEAD_SHA" --verbose
           elif [ "$PUSH_BEFORE_SHA" = "0000000000000000000000000000000000000000" ]; then
-            commitlint --last --verbose
+            commitlint --config .commitlintrc.cjs --last --verbose
           else
-            commitlint --from "$PUSH_BEFORE_SHA" --to "$PUSH_SHA" --verbose
+            commitlint --config .commitlintrc.cjs --from "$PUSH_BEFORE_SHA" --to "$PUSH_SHA" --verbose
           fi
-
-      - name: Save npm + commitlint tools cache
-        if: ${{ always() }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ~/.npm
-            ~/.cache/bramble-go/commitlint-tools
-          key: ${{ steps.commitlint-cache-restore.outputs.cache-primary-key }}
