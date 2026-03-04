@@ -12,6 +12,14 @@ on:
         required: false
         default: false
 
+env:
+  NODE_VERSION: '20'
+  SEMREL_VERSION: '24'
+  SEMREL_COMMIT_ANALYZER_VERSION: '13'
+  SEMREL_NOTES_GENERATOR_VERSION: '14'
+  SEMREL_GITEA_VERSION: '2'
+  RELEASE_CACHE_PREFIX: release-tools-v1
+
 jobs:
   semantic-release:
     # Gitea runners in this environment use "linux" labels.
@@ -28,7 +36,19 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Restore npm + release tools cache
+        id: release-cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/bramble-go/release-tools
+          key: ${{ runner.os }}-${{ env.RELEASE_CACHE_PREFIX }}-node${{ env.NODE_VERSION }}-sr${{ env.SEMREL_VERSION }}-${{ hashFiles('.gitea/workflows/release.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.RELEASE_CACHE_PREFIX }}-node${{ env.NODE_VERSION }}-sr${{ env.SEMREL_VERSION }}-
+            ${{ runner.os }}-${{ env.RELEASE_CACHE_PREFIX }}-node${{ env.NODE_VERSION }}-
 
       - name: Validate release prerequisites
         env:
@@ -48,13 +68,16 @@ jobs:
             exit 1
           fi
 
-      - name: Install semantic-release dependencies
+      - name: Install semantic-release dependencies (pinned)
         run: |
-          npm install --no-save \
-            semantic-release@24 \
-            @semantic-release/commit-analyzer@13 \
-            @semantic-release/release-notes-generator@14 \
-            @saithodev/semantic-release-gitea@2
+          set -euo pipefail
+          TOOLS_DIR="$HOME/.cache/bramble-go/release-tools"
+          mkdir -p "$TOOLS_DIR"
+          npm install --prefix "$TOOLS_DIR" --no-save \
+            "semantic-release@${SEMREL_VERSION}" \
+            "@semantic-release/commit-analyzer@${SEMREL_COMMIT_ANALYZER_VERSION}" \
+            "@semantic-release/release-notes-generator@${SEMREL_NOTES_GENERATOR_VERSION}" \
+            "@saithodev/semantic-release-gitea@${SEMREL_GITEA_VERSION}"
 
       - name: Run semantic-release
         env:
@@ -71,4 +94,16 @@ jobs:
             dry_flag="--dry-run"
           fi
 
-          npx semantic-release $dry_flag
+          export TOOLS_DIR="$HOME/.cache/bramble-go/release-tools"
+          export PATH="$TOOLS_DIR/node_modules/.bin:$PATH"
+          export NODE_PATH="$TOOLS_DIR/node_modules"
+          semantic-release $dry_flag
+
+      - name: Save npm + release tools cache
+        if: ${{ always() }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.npm
+            ~/.cache/bramble-go/release-tools
+          key: ${{ steps.release-cache-restore.outputs.cache-primary-key }}

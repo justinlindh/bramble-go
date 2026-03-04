@@ -18,6 +18,9 @@ on:
       - .golangci.yml
       - .gitea/workflows/go-quality.yml
 
+env:
+  GO_CACHE_PREFIX: go-quality-v1
+
 jobs:
   test:
     name: go test
@@ -31,11 +34,31 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
-          cache-dependency-path: go.sum
+          cache: false
+
+      - name: Restore Go caches
+        id: go-cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-${{ hashFiles('.gitea/workflows/go-quality.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-
+            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-
 
       - name: Run tests
         run: go test ./...
+
+      - name: Save Go caches
+        if: ${{ always() }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ steps.go-cache-restore.outputs.cache-primary-key }}
 
   vet:
     name: go vet
@@ -49,11 +72,31 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
-          cache-dependency-path: go.sum
+          cache: false
+
+      - name: Restore Go caches
+        id: go-cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-${{ hashFiles('.gitea/workflows/go-quality.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-
+            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-
 
       - name: Run vet
         run: go vet ./...
+
+      - name: Save Go caches
+        if: ${{ always() }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ steps.go-cache-restore.outputs.cache-primary-key }}
 
   lint:
     name: golangci-lint
@@ -67,8 +110,20 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
-          cache-dependency-path: go.sum
+          cache: false
+
+      - name: Restore Go and lint caches
+        id: go-cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+            ~/.cache/golangci-lint
+          key: ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-${{ hashFiles('.gitea/workflows/go-quality.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-
+            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-
 
       - name: Setup golangci-lint
         uses: golangci/golangci-lint-action@v6
@@ -77,6 +132,16 @@ jobs:
           skip-cache: false
           skip-save-cache: false
           args: --timeout=5m
+
+      - name: Save Go and lint caches
+        if: ${{ always() }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+            ~/.cache/golangci-lint
+          key: ${{ steps.go-cache-restore.outputs.cache-primary-key }}
 
   build:
     name: go build
@@ -90,8 +155,28 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
-          cache-dependency-path: go.sum
+          cache: false
+
+      - name: Restore Go caches
+        id: go-cache-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-${{ hashFiles('.gitea/workflows/go-quality.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-${{ hashFiles('go.sum') }}-
+            ${{ runner.os }}-${{ env.GO_CACHE_PREFIX }}-
 
       - name: Build all packages
         run: go build ./...
+
+      - name: Save Go caches
+        if: ${{ always() }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ steps.go-cache-restore.outputs.cache-primary-key }}
