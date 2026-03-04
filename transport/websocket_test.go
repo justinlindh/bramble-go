@@ -3,6 +3,8 @@ package transport
 import (
 	"context"
 	"errors"
+	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -158,6 +160,21 @@ func TestWebSocketConnectHandshakeError(t *testing.T) {
 	err := w.Connect(context.Background())
 	if err == nil {
 		t.Fatal("expected Connect handshake error")
+	}
+}
+
+func TestWebSocketSendReturnsReconnectingOnClosedConnection(t *testing.T) {
+	origWrite := websocketWriteFunc
+	defer func() { websocketWriteFunc = origWrite }()
+
+	websocketWriteFunc = func(_ *websocket.Conn, _ context.Context, _ []byte) error {
+		return fmt.Errorf("write failed: %w", net.ErrClosed)
+	}
+
+	w := NewWebSocket("ws://example.invalid")
+	w.conn = &websocket.Conn{}
+	if err := w.Send([]byte(`{"hello":"world"}`)); !errors.Is(err, ErrReconnecting) {
+		t.Fatalf("expected ErrReconnecting, got %v", err)
 	}
 }
 

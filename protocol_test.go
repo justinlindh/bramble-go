@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -149,5 +150,60 @@ func TestProtocol_ConcurrentCalls(t *testing.T) {
 		if err := <-errs; err != nil {
 			t.Errorf("concurrent call error: %v", err)
 		}
+	}
+}
+
+type flakyReconnectTransport struct {
+	mu    sync.Mutex
+	sends int
+	recv  chan []byte
+}
+
+func (f *flakyReconnectTransport) Connect(context.Context) error { return nil }
+func (f *flakyReconnectTransport) Close() error                  { return nil }
+func (f *flakyReconnectTransport) Info() string                  { return "flaky" }
+
+func (f *flakyReconnectTransport) Send(_ []byte) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.sends++
+	if f.sends == 1 {
+		return transport.ErrReconnecting
+	}
+	return nil
+}
+
+func (f *flakyReconnectTransport) Receive(ctx context.Context) ([]byte, error) {
+	select {
+	case data := <-f.recv:
+		return data, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func TestProtocol_CallRetriesWhileTransportReconnecting(t *testing.T) {
+	tpt := &flakyReconnectTransport{recv: make(chan []byte, 1)}
+	p := NewProtocol(tpt)
+	p.Start()
+	defer p.Stop()
+
+	tpt.recv <- []byte(`{"jsonrpc":"2.0","id":1,"result":{"ok":true}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	raw, err := p.Call(ctx, "bramble.ping", nil)
+	if err != nil {
+		t.Fatalf("Call error: %v", err)
+	}
+	if string(raw) != `{"ok":true}` {
+		t.Fatalf("unexpected result: %s", raw)
+	}
+
+	tpt.mu.Lock()
+	defer tpt.mu.Unlock()
+	if tpt.sends < 2 {
+		t.Fatalf("expected retry send, got sends=%d", tpt.sends)
 	}
 }

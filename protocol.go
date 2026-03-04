@@ -3,9 +3,11 @@ package bramble
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/justinlindh/bramble-go/transport"
 )
@@ -147,8 +149,21 @@ func (p *Protocol) Call(ctx context.Context, method string, params any) (json.Ra
 	p.pending.Store(id, ch)
 	defer p.pending.Delete(id)
 
-	if err := p.t.Send(data); err != nil {
-		return nil, fmt.Errorf("bramble: send %s: %w", method, err)
+	for {
+		err := p.t.Send(data)
+		if err == nil {
+			break
+		}
+		if !errors.Is(err, transport.ErrReconnecting) {
+			return nil, fmt.Errorf("bramble: send %s: %w", method, err)
+		}
+		select {
+		case <-ctx.Done():
+			return nil, fmt.Errorf("bramble: %s: %w", method, ctx.Err())
+		case <-p.done:
+			return nil, fmt.Errorf("bramble: %s: %w", method, transport.ErrClosed)
+		case <-time.After(50 * time.Millisecond):
+		}
 	}
 
 	select {

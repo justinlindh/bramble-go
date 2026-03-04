@@ -2,8 +2,11 @@ package transport
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,8 +14,11 @@ import (
 )
 
 var (
-	websocketDialFunc = websocket.Dial
-	websocketSleep    = time.Sleep
+	websocketDialFunc  = websocket.Dial
+	websocketSleep     = time.Sleep
+	websocketWriteFunc = func(conn *websocket.Conn, ctx context.Context, data []byte) error {
+		return conn.Write(ctx, websocket.MessageText, data)
+	}
 )
 
 // WebSocket is a Transport that communicates with a Bramble node over a WebSocket connection.
@@ -77,10 +83,27 @@ func (w *WebSocket) Send(data []byte) error {
 	}
 
 	ctx := context.Background()
-	if err := conn.Write(ctx, websocket.MessageText, data); err != nil {
+	if err := websocketWriteFunc(conn, ctx, data); err != nil {
+		if shouldReconnectWriteErr(err) {
+			go func() { _ = w.reconnect() }()
+			return ErrReconnecting
+		}
 		return fmt.Errorf("bramble/transport/websocket: write: %w", err)
 	}
 	return nil
+}
+
+func shouldReconnectWriteErr(err error) bool {
+	if errors.Is(err, net.ErrClosed) {
+		return true
+	}
+	if websocket.CloseStatus(err) != -1 {
+		return true
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "closed network connection") ||
+		strings.Contains(s, "broken pipe") ||
+		strings.Contains(s, "connection reset by peer")
 }
 
 // Receive blocks until a WebSocket message is available or the context is cancelled.
