@@ -2,6 +2,7 @@ package bramble
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 )
@@ -74,5 +75,43 @@ func TestClient_OnBroadcastDelivery_UnknownFieldTolerance(t *testing.T) {
 		}
 	case <-ctx.Done():
 		t.Fatal("timed out waiting for OnBroadcastDelivery callback with unknown fields")
+	}
+}
+
+func TestClient_BroadcastOnChannelCritical(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"packet_id":"CAFEBABE","status":"sent"}}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	result, err := c.BroadcastOnChannelCritical(ctx, 7, "urgent channel")
+	if err != nil {
+		t.Fatalf("BroadcastOnChannelCritical error: %v", err)
+	}
+	if result.MessageID != "CAFEBABE" {
+		t.Fatalf("MessageID: got %q, want CAFEBABE", result.MessageID)
+	}
+	if result.Status != "sent" {
+		t.Fatalf("Status: got %q, want sent", result.Status)
+	}
+	if result.BroadcastID != "" {
+		t.Fatalf("BroadcastID: got %q, want empty for sendMessage path", result.BroadcastID)
+	}
+
+	sent := mock.Sent()
+	if len(sent) != 1 {
+		t.Fatalf("expected 1 sent request, got %d", len(sent))
+	}
+	if !strings.Contains(sent[0], `"method":"bramble.sendMessage"`) {
+		t.Fatalf("expected bramble.sendMessage request, got: %s", sent[0])
+	}
+	if !strings.Contains(sent[0], `"dest":"FFFFFFFE"`) || !strings.Contains(sent[0], `"channel":7`) {
+		t.Fatalf("expected channel broadcast destination in request, got: %s", sent[0])
+	}
+	if !strings.Contains(sent[0], `"critical":true`) {
+		t.Fatalf("expected critical=true in request, got: %s", sent[0])
 	}
 }
