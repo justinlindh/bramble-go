@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"io"
@@ -132,6 +133,95 @@ func TestSerialReceiveContextCancel(t *testing.T) {
 	}
 }
 
+func TestSerialSendSuccessAndNotConnected(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		s := NewSerial("/dev/fake")
+		conn := &fakeSerialPort{}
+		s.conn = conn
+
+		if err := s.Send([]byte(`{"id":1}`)); err != nil {
+			t.Fatalf("Send error: %v", err)
+		}
+
+		conn.mu.Lock()
+		defer conn.mu.Unlock()
+		if len(conn.writes) != 1 {
+			t.Fatalf("expected 1 write, got %d", len(conn.writes))
+		}
+		if got := string(conn.writes[0]); got != `{"id":1}`+"\n" {
+			t.Fatalf("unexpected wire payload %q", got)
+		}
+	})
+
+	t.Run("not connected", func(t *testing.T) {
+		s := NewSerial("/dev/fake")
+		if err := s.Send([]byte(`{"id":1}`)); !errors.Is(err, ErrNotConnected) {
+			t.Fatalf("expected ErrNotConnected, got %v", err)
+		}
+	})
+}
+
+func TestSerialReceiveErrorAndClosed(t *testing.T) {
+	t.Run("read error", func(t *testing.T) {
+		s := NewSerial("/dev/fake")
+		expected := errors.New("boom")
+		s.errCh <- expected
+
+		got, err := s.Receive(context.Background())
+		if got != nil {
+			t.Fatalf("expected nil payload, got %q", string(got))
+		}
+		if !errors.Is(err, expected) {
+			t.Fatalf("expected %v, got %v", expected, err)
+		}
+	})
+
+	t.Run("closed", func(t *testing.T) {
+		s := NewSerial("/dev/fake")
+		if err := s.Close(); err != nil {
+			t.Fatalf("Close error: %v", err)
+		}
+		if _, err := s.Receive(context.Background()); !errors.Is(err, ErrClosed) {
+			t.Fatalf("expected ErrClosed, got %v", err)
+		}
+	})
+}
+
+func TestSerialReader_ReconnectFailurePropagatesError(t *testing.T) {
+	origOpen := serialOpenFunc
+	origSleep := serialSleep
+	defer func() {
+		serialOpenFunc = origOpen
+		serialSleep = origSleep
+	}()
+
+	s := NewSerial("/dev/fake")
+	s.conn = &fakeSerialPort{}
+	s.scanner = bufio.NewScanner(s.conn)
+	serialOpenFunc = func(_ string, _ *serial.Mode) (serial.Port, error) {
+		return nil, errors.New("port down")
+	}
+	serialSleep = func(_ time.Duration) {
+		_ = s.Close()
+	}
+
+	done := make(chan struct{})
+	go func() {
+		s.reader()
+		close(done)
+	}()
+
+	select {
+	case err := <-s.errCh:
+		if err == nil || !strings.Contains(err.Error(), "reconnect failed") {
+			t.Fatalf("expected reconnect failure, got %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for reconnect failure")
+	}
+	<-done
+}
+
 func TestBuildAuthRequest(t *testing.T) {
 	got := string(buildAuthRequest("abc123"))
 	want := `{"jsonrpc":"2.0","method":"bramble.auth","params":{"token":"abc123"},"id":0}`
@@ -200,6 +290,20 @@ func (p *pipeSerialPort) sent() []string {
 	return out
 }
 
+func TestSerialConnect_OpenFailure(t *testing.T) {
+	origOpen := serialOpenFunc
+	defer func() { serialOpenFunc = origOpen }()
+
+	serialOpenFunc = func(_ string, _ *serial.Mode) (serial.Port, error) {
+		return nil, errors.New("open failure")
+	}
+
+	s := NewSerial("/dev/missing")
+	if err := s.Connect(context.Background()); err == nil || !strings.Contains(err.Error(), "open /dev/missing") {
+		t.Fatalf("expected open error, got %v", err)
+	}
+}
+
 func TestSerialConnect_WithAuthAndReader(t *testing.T) {
 	origOpen := serialOpenFunc
 	defer func() { serialOpenFunc = origOpen }()
@@ -240,5 +344,28 @@ func TestSerialConnect_WithAuthAndReader(t *testing.T) {
 	}
 	if !strings.Contains(sent[0], `"method":"bramble.auth"`) || !strings.Contains(sent[0], `"token":"sekret"`) {
 		t.Fatalf("unexpected auth request write: %q", sent[0])
+	}
+}
+
+func TestSerialConnect_AuthFailure(t *testing.T) {
+	origOpen := serialOpenFunc
+	defer func() { serialOpenFunc = origOpen }()
+
+	port := newPipeSerialPort()
+	serialOpenFunc = func(_ string, _ *serial.Mode) (serial.Port, error) {
+		return port, nil
+	}
+
+	go func() {
+		port.feed(`{"jsonrpc":"2.0","id":0,"error":{"code":-32001,"message":"unauthorized"}}` + "\n")
+	}()
+
+	s := NewSerial("/dev/fake", WithAuthToken("bad-token"))
+	err := s.Connect(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "auth validate") {
+		t.Fatalf("expected auth validation error, got %v", err)
+	}
+	if s.conn != nil {
+		t.Fatal("connection should be cleared after auth failure")
 	}
 }

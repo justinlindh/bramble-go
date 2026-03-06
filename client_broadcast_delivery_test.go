@@ -97,6 +97,9 @@ func TestClient_BroadcastOnChannelCritical(t *testing.T) {
 	if result.Status != "sent" {
 		t.Fatalf("Status: got %q, want sent", result.Status)
 	}
+	if result.BroadcastID != "" {
+		t.Fatalf("BroadcastID: got %q, want empty for sendMessage path", result.BroadcastID)
+	}
 
 	sent := mock.Sent()
 	if len(sent) != 1 {
