@@ -48,11 +48,15 @@ type WebSocket struct {
 
 // NewWebSocket creates a new WebSocket transport for the given URL.
 // The URL should use the ws:// or wss:// scheme (e.g. "ws://192.168.4.1/ws").
-func NewWebSocket(url string) *WebSocket {
-	return &WebSocket{
+func NewWebSocket(url string, opts ...Option) *WebSocket {
+	w := &WebSocket{
 		url:  url,
 		done: make(chan struct{}),
 	}
+	for _, o := range opts {
+		o.applyWebSocket(w)
+	}
+	return w
 }
 
 // Connect dials the WebSocket server and establishes a connection.

@@ -18,23 +18,6 @@ var (
 
 const defaultBaudRate = 115200
 
-// SerialOption is a functional option for configuring a Serial transport.
-type SerialOption func(*Serial)
-
-// WithBaudRate sets the baud rate for the serial connection.
-func WithBaudRate(baud int) SerialOption {
-	return func(s *Serial) {
-		s.baud = baud
-	}
-}
-
-// WithAuthToken sets an auth token used for bramble.auth after connect.
-func WithAuthToken(token string) SerialOption {
-	return func(s *Serial) {
-		s.AuthToken = token
-	}
-}
-
 // Serial is a Transport that communicates with a Bramble node over a UART/serial port.
 // Messages are newline-delimited JSON. Lines not starting with '{' (e.g., ESP-IDF log
 // output and console prompts) are skipped transparently.
@@ -66,7 +49,7 @@ type Serial struct {
 
 // NewSerial creates a new Serial transport for the given port.
 // Default baud rate is 115200; override with WithBaudRate.
-func NewSerial(port string, opts ...SerialOption) *Serial {
+func NewSerial(port string, opts ...Option) *Serial {
 	s := &Serial{
 		port:   port,
 		baud:   defaultBaudRate,
@@ -75,7 +58,7 @@ func NewSerial(port string, opts ...SerialOption) *Serial {
 		done:   make(chan struct{}),
 	}
 	for _, o := range opts {
-		o(s)
+		o.applySerial(s)
 	}
 	return s
 }
