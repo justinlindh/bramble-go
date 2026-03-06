@@ -3,6 +3,8 @@ package transport
 import (
 	"context"
 	"errors"
+	"io"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -135,5 +137,108 @@ func TestBuildAuthRequest(t *testing.T) {
 	want := `{"jsonrpc":"2.0","method":"bramble.auth","params":{"token":"abc123"},"id":0}`
 	if got != want {
 		t.Fatalf("unexpected auth request.\nwant: %s\n got: %s", want, got)
+	}
+}
+
+type pipeSerialPort struct {
+	pr     *io.PipeReader
+	pw     *io.PipeWriter
+	closed bool
+	mu     sync.Mutex
+	writes [][]byte
+}
+
+func newPipeSerialPort() *pipeSerialPort {
+	pr, pw := io.Pipe()
+	return &pipeSerialPort{pr: pr, pw: pw}
+}
+
+func (p *pipeSerialPort) SetMode(_ *serial.Mode) error { return nil }
+func (p *pipeSerialPort) Read(b []byte) (int, error) { return p.pr.Read(b) }
+func (p *pipeSerialPort) Drain() error { return nil }
+func (p *pipeSerialPort) ResetInputBuffer() error { return nil }
+func (p *pipeSerialPort) ResetOutputBuffer() error { return nil }
+func (p *pipeSerialPort) SetDTR(_ bool) error { return nil }
+func (p *pipeSerialPort) SetRTS(_ bool) error { return nil }
+func (p *pipeSerialPort) GetModemStatusBits() (*serial.ModemStatusBits, error) {
+	return &serial.ModemStatusBits{}, nil
+}
+func (p *pipeSerialPort) SetReadTimeout(_ time.Duration) error { return nil }
+func (p *pipeSerialPort) Break(_ time.Duration) error          { return nil }
+func (p *pipeSerialPort) SetReadDeadline(_ time.Time) error    { return nil }
+
+func (p *pipeSerialPort) Write(b []byte) (int, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	cp := append([]byte(nil), b...)
+	p.writes = append(p.writes, cp)
+	return len(b), nil
+}
+
+func (p *pipeSerialPort) Close() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.closed {
+		return nil
+	}
+	p.closed = true
+	_ = p.pr.Close()
+	return p.pw.Close()
+}
+
+func (p *pipeSerialPort) feed(line string) {
+	_, _ = p.pw.Write([]byte(line))
+}
+
+func (p *pipeSerialPort) sent() []string {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	out := make([]string, 0, len(p.writes))
+	for _, w := range p.writes {
+		out = append(out, string(w))
+	}
+	return out
+}
+
+func TestSerialConnect_WithAuthAndReader(t *testing.T) {
+	origOpen := serialOpenFunc
+	defer func() { serialOpenFunc = origOpen }()
+
+	port := newPipeSerialPort()
+	serialOpenFunc = func(_ string, _ *serial.Mode) (serial.Port, error) {
+		return port, nil
+	}
+
+	s := NewSerial("/dev/fake", WithAuthToken("sekret"))
+	if s.AuthToken != "sekret" {
+		t.Fatalf("AuthToken: got %q, want sekret", s.AuthToken)
+	}
+
+	go func() {
+		port.feed("boot log...\n")
+		port.feed(`{"jsonrpc":"2.0","id":0,"result":{"ok":true}}` + "\n")
+		port.feed("I (123) app: ready\n")
+		port.feed(`{"jsonrpc":"2.0","method":"bramble.onMessage","params":{"text":"hello"}}` + "\n")
+	}()
+
+	if err := s.Connect(context.Background()); err != nil {
+		t.Fatalf("Connect error: %v", err)
+	}
+	defer s.Close()
+
+	received, err := s.Receive(context.Background())
+	if err != nil {
+		t.Fatalf("Receive error: %v", err)
+	}
+	if got := string(received); !strings.Contains(got, `"method":"bramble.onMessage"`) {
+		t.Fatalf("unexpected received payload: %s", got)
+	}
+
+	sent := port.sent()
+	if len(sent) == 0 {
+		t.Fatal("expected auth request to be written")
+	}
+	if !strings.Contains(sent[0], `"method":"bramble.auth"`) || !strings.Contains(sent[0], `"token":"sekret"`) {
+		t.Fatalf("unexpected auth request write: %q", sent[0])
 	}
 }
