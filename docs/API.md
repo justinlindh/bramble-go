@@ -61,12 +61,12 @@ fmt.Printf("delivery events replayed=%d\n", len(replay.Events))
 | `BroadcastOnChannelCritical(ctx, channel, text)` | `*SendResult` | Critical-priority broadcast on a specific channel |
 | `SendProbe(ctx)` | `*SendProbeResult` | Network reachability probe |
 | `SetRadio(ctx, config)` | `error` | Update radio parameters |
-| `SetNodeName(ctx, name)` | `error` | Set node display name (max 32 chars) |
+| `SetNodeName(ctx, name)` | `error` | Set node display name (max 8 chars) |
 | `AddChannel(ctx, name, psk)` | `*AddChannelResult` | Add a channel |
 | `RemoveChannel(ctx, index)` | `error` | Remove a channel by index |
 | `SetDefaultChannel(ctx, index)` | `error` | Set default outgoing channel |
 | `SetMailbox(ctx, enabled)` | `error` | Toggle store-and-forward |
-| `SetLocationConfig(ctx, config)` | `error` | Update GPS settings |
+| `SetLocationConfig(ctx, config)` | `error` | Update location sharing configuration |
 | `SetLocationContact(ctx, addr, tier)` | `error` | Add/update location contact |
 | `RemoveLocationContact(ctx, addr)` | `error` | Stop sharing location |
 | `ShareLocationOnce(ctx, addr)` | `error` | One-shot location share |
@@ -132,34 +132,9 @@ client.OnTrafficEvent(func(e bramble.TrafficEvent) {
 
 ## Key Types
 
-```go
-type StatusResponse struct {
-    Address, FirmwareVersion, ProtocolVersion, Hardware string
-    RadioOk bool
-    Peers, BeaconTx, BeaconRx, PacketsTx, PacketsRx, UptimeSec int
-}
+The canonical type definitions live in [`types.go`](../types.go) and are kept in sync with firmware wire fields.
 
-type Neighbor struct {
-    Address string; RSSI int; SNR float64; LastSeenAgoMs int64
-}
-
-type SendResult struct {
-    MessageID      string
-    PacketID       string
-    BroadcastID    string
-    Status         string
-    Fragmented     bool
-    FragmentsTotal int
-    MaxBytes       int
-    ActualBytes    int
-    Broadcast      bool
-    Channel        int
-}
-
-type ConfigResponse struct {
-    NodeName, Address string; Radio ConfigRadio; Channels []Channel
-}
-```
+Notably, `StatusResponse` and `ConfigResponse` include additional fields beyond older snippets (for example `SupportsDeliveryEventSync` and `Location`) — refer to source for the current schema.
 
 ## Action Messages (`/me`)
 

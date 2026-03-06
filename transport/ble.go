@@ -170,7 +170,7 @@ func (b *BLE) Connect(ctx context.Context) error {
 	return nil
 }
 
-// onNotification handles incoming BLE data and assembles newline-delimited JSON lines.
+// authenticate performs an auth handshake when AuthToken is configured.
 func (b *BLE) authenticate(ctx context.Context) error {
 	if b.cfg.AuthToken == "" {
 		return nil
