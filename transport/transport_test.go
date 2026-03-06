@@ -21,9 +21,12 @@ func TestErrorVariablesDistinct(t *testing.T) {
 // --- WebSocket additional tests ---
 
 func TestNewWebSocketConfig(t *testing.T) {
-	w := NewWebSocket("ws://192.168.4.1/ws")
+	w := NewWebSocket("ws://192.168.4.1/ws", WithAuthToken("secret"))
 	if w.url != "ws://192.168.4.1/ws" {
 		t.Fatalf("unexpected url: %s", w.url)
+	}
+	if w.AuthToken != "secret" {
+		t.Fatalf("unexpected auth token: %q", w.AuthToken)
 	}
 	if w.done == nil {
 		t.Fatal("done channel should be initialized")
@@ -153,14 +156,14 @@ func TestBLEChunkingBoundaries(t *testing.T) {
 		dataLen  int
 		expected int // number of chunks for data + newline
 	}{
-		{"empty", 0, 1},            // just newline: 1 byte -> 1 chunk
-		{"small", 100, 1},          // 101 bytes -> 1 chunk
-		{"exactly_239", 239, 1},    // 240 bytes (239+nl) -> 1 chunk
-		{"exactly_240", 240, 2},    // 241 bytes -> 2 chunks
-		{"241_bytes", 241, 2},      // 242 bytes -> 2 chunks
-		{"479_bytes", 479, 2},      // 480 bytes -> 2 chunks
-		{"480_bytes", 480, 3},      // 481 bytes -> 3 chunks
-		{"720_bytes", 720, 4},      // 721 bytes -> 4 chunks
+		{"empty", 0, 1},         // just newline: 1 byte -> 1 chunk
+		{"small", 100, 1},       // 101 bytes -> 1 chunk
+		{"exactly_239", 239, 1}, // 240 bytes (239+nl) -> 1 chunk
+		{"exactly_240", 240, 2}, // 241 bytes -> 2 chunks
+		{"241_bytes", 241, 2},   // 242 bytes -> 2 chunks
+		{"479_bytes", 479, 2},   // 480 bytes -> 2 chunks
+		{"480_bytes", 480, 3},   // 481 bytes -> 3 chunks
+		{"720_bytes", 720, 4},   // 721 bytes -> 4 chunks
 	}
 
 	for _, tc := range tests {
