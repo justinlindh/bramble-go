@@ -152,6 +152,7 @@ type Message struct {
 	// Timestamp is seconds since epoch (firmware key: timestamp_s).
 	Timestamp int64  `json:"timestamp_s"`
 	MsgID     string `json:"msg_id,omitempty"`
+	Status    string `json:"status,omitempty"`
 }
 
 // AirtimeTier holds the airtime budget for a single priority tier.
