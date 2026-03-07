@@ -552,6 +552,22 @@ func (c *Client) SetNodeName(ctx context.Context, name string) error {
 	return checkOK(raw, "setNodeName")
 }
 
+// GetAuthToken retrieves the device's WebSocket auth token.
+// Typically called over serial since WS connections require the token to connect.
+func (c *Client) GetAuthToken(ctx context.Context) (string, error) {
+	raw, err := c.proto.Call(ctx, "bramble.getAuthToken", nil)
+	if err != nil {
+		return "", err
+	}
+	var resp struct {
+		Token string `json:"token"`
+	}
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return "", fmt.Errorf("bramble: decode getAuthToken: %w", err)
+	}
+	return resp.Token, nil
+}
+
 // SetAuthToken sets or clears the WebSocket auth token.
 func (c *Client) SetAuthToken(ctx context.Context, token string) error {
 	raw, err := c.proto.Call(ctx, "bramble.setAuthToken", map[string]string{"token": token})
