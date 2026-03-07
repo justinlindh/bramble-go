@@ -538,11 +538,40 @@ func (c *Client) SetLocationConfig(ctx context.Context, config LocationConfig) e
 }
 
 // SetLocationContact adds or updates a location sharing contact.
-func (c *Client) SetLocationContact(ctx context.Context, addr uint32, tier string) error {
-	raw, err := c.proto.Call(ctx, "bramble.setLocationContact", map[string]any{
+//
+// Backward-compatible usage keeps the original addr+tier arguments:
+//
+//	_ = c.SetLocationContact(ctx, 0xAABBCCDD, "normal")
+//
+// To set additional optional firmware-supported fields (enabled, interval_s),
+// pass a LocationContactRule override as the variadic 4th argument:
+//
+//	enabled := false
+//	interval := 300
+//	_ = c.SetLocationContact(ctx, 0xAABBCCDD, "normal", LocationContactRule{Enabled: &enabled, IntervalS: &interval})
+func (c *Client) SetLocationContact(ctx context.Context, addr uint32, tier string, overrides ...LocationContactRule) error {
+	payload := map[string]any{
 		"address": fmt.Sprintf("%08X", addr),
 		"tier":    tier,
-	})
+	}
+
+	if len(overrides) > 0 {
+		rule := overrides[0]
+		if rule.Address != "" {
+			payload["address"] = rule.Address
+		}
+		if rule.Tier != "" {
+			payload["tier"] = rule.Tier
+		}
+		if rule.Enabled != nil {
+			payload["enabled"] = *rule.Enabled
+		}
+		if rule.IntervalS != nil {
+			payload["interval_s"] = *rule.IntervalS
+		}
+	}
+
+	raw, err := c.proto.Call(ctx, "bramble.setLocationContact", payload)
 	if err != nil {
 		return err
 	}

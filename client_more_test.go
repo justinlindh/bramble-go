@@ -107,11 +107,17 @@ func TestClient_ActionAndConfigMethodsCoverage(t *testing.T) {
 	if err := c.SetMailbox(ctx, true); err != nil { t.Fatalf("SetMailbox: %v", err) }
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":8,"result":{"ok":true}}`)
 	if err := c.SetLocationContact(ctx, 0xAABBCCDD, "normal"); err != nil { t.Fatalf("SetLocationContact: %v", err) }
+	enabled := false
+	interval := 900
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":9,"result":{"ok":true}}`)
-	if err := c.RemoveLocationContact(ctx, 0xAABBCCDD); err != nil { t.Fatalf("RemoveLocationContact: %v", err) }
+	if err := c.SetLocationContact(ctx, 0xAABBCCDD, "normal", LocationContactRule{Enabled: &enabled, IntervalS: &interval}); err != nil {
+		t.Fatalf("SetLocationContact with rule override: %v", err)
+	}
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":10,"result":{"ok":true}}`)
-	if err := c.ShareLocationOnce(ctx, 0xAABBCCDD); err != nil { t.Fatalf("ShareLocationOnce: %v", err) }
+	if err := c.RemoveLocationContact(ctx, 0xAABBCCDD); err != nil { t.Fatalf("RemoveLocationContact: %v", err) }
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":11,"result":{"ok":true}}`)
+	if err := c.ShareLocationOnce(ctx, 0xAABBCCDD); err != nil { t.Fatalf("ShareLocationOnce: %v", err) }
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":12,"result":{"ok":true}}`)
 	if err := c.Reboot(ctx); err != nil { t.Fatalf("Reboot: %v", err) }
 
 	sent := strings.Join(mock.Sent(), "\n")
@@ -123,6 +129,8 @@ func TestClient_ActionAndConfigMethodsCoverage(t *testing.T) {
 		`"method":"bramble.setMailbox"`,
 		`"method":"bramble.setLocationContact"`,
 		`"address":"AABBCCDD"`,
+		`"enabled":false`,
+		`"interval_s":900`,
 		`"method":"bramble.removeLocationContact"`,
 		`"method":"bramble.shareLocationOnce"`,
 		`"method":"bramble.reboot"`,
