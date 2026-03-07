@@ -320,5 +320,10 @@ func (s *Serial) Info() string {
 	return fmt.Sprintf("serial:%s@%d", s.port, s.baud)
 }
 
+// SetAuthToken sets the authentication token for the serial transport.
+func (s *Serial) SetAuthToken(token string) {
+	s.AuthToken = token
+}
+
 // Ensure Serial implements Transport at compile time.
 var _ Transport = (*Serial)(nil)

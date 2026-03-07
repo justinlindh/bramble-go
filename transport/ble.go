@@ -265,6 +265,12 @@ func (b *BLE) Close() error {
 	return b.device.Disconnect()
 }
 
+// SetAuthToken sets the authentication token for the BLE transport.
+// The token is stored in the nested BLEConfig.AuthConfig.
+func (b *BLE) SetAuthToken(token string) {
+	b.cfg.AuthToken = token
+}
+
 // Info returns a description of the BLE transport.
 func (b *BLE) Info() string {
 	if b.cfg.DeviceName != "" {

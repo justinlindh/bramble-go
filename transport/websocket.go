@@ -232,5 +232,10 @@ func (w *WebSocket) Info() string {
 	return fmt.Sprintf("websocket:%s", w.url)
 }
 
+// SetAuthToken sets the authentication token for the WebSocket transport.
+func (w *WebSocket) SetAuthToken(token string) {
+	w.AuthToken = token
+}
+
 // Ensure WebSocket implements Transport at compile time.
 var _ Transport = (*WebSocket)(nil)

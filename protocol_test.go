@@ -162,6 +162,7 @@ type flakyReconnectTransport struct {
 func (f *flakyReconnectTransport) Connect(context.Context) error { return nil }
 func (f *flakyReconnectTransport) Close() error                  { return nil }
 func (f *flakyReconnectTransport) Info() string                  { return "flaky" }
+func (f *flakyReconnectTransport) SetAuthToken(_ string)         {}
 
 func (f *flakyReconnectTransport) Send(_ []byte) error {
 	f.mu.Lock()

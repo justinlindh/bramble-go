@@ -113,6 +113,9 @@ func (m *MockTransport) IsConnected() bool {
 	return m.connected
 }
 
+// SetAuthToken is a no-op for the mock transport (satisfies the Transport interface).
+func (m *MockTransport) SetAuthToken(_ string) {}
+
 // Ensure MockTransport implements Transport at compile time.
 var _ Transport = (*MockTransport)(nil)
 

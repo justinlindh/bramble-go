@@ -25,6 +25,10 @@ type Transport interface {
 
 	// Info returns a human-readable description of the transport endpoint.
 	Info() string
+
+	// SetAuthToken configures the authentication token used during connection.
+	// Must be called before Connect.
+	SetAuthToken(token string)
 }
 
 // AuthConfig contains optional authentication settings shared by transports.
