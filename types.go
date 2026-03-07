@@ -43,6 +43,96 @@ type WifiStatus struct {
 	Clients int    `json:"clients"`
 }
 
+// BatteryStatus is returned by bramble.getBattery.
+type BatteryStatus struct {
+	VoltageMV  int `json:"voltage_mv"`
+	Percentage int `json:"percentage"`
+}
+
+// GpsPosition is returned by bramble.getGpsPosition.
+type GpsPosition struct {
+	Lat        float64 `json:"lat,omitempty"`
+	Lon        float64 `json:"lon,omitempty"`
+	Alt        float64 `json:"alt,omitempty"`
+	SpeedKmh   float64 `json:"speed_kmh,omitempty"`
+	HeadingDeg float64 `json:"heading_deg,omitempty"`
+	AccuracyM  float64 `json:"accuracy_m,omitempty"`
+	Timestamp  int64   `json:"timestamp,omitempty"`
+	Valid      bool    `json:"valid"`
+}
+
+// BeaconPolicyConfig is the config section returned by bramble.getBeaconPolicy.
+type BeaconPolicyConfig struct {
+	Enabled        bool   `json:"enabled"`
+	Mode           string `json:"mode"`
+	BaseIntervalMs int    `json:"baseIntervalMs"`
+	MinIntervalMs  int    `json:"minIntervalMs"`
+	MaxIntervalMs  int    `json:"maxIntervalMs"`
+	DenseThreshold int    `json:"denseThreshold"`
+	ChurnThreshold int    `json:"churnThreshold"`
+	ChurnWindowMs  int    `json:"churnWindowMs"`
+}
+
+// BeaconPolicyStatus is the status section returned by bramble.getBeaconPolicy.
+type BeaconPolicyStatus struct {
+	ActiveMode        string `json:"activeMode"`
+	CurrentIntervalMs int    `json:"currentIntervalMs"`
+	NeighborCount     int    `json:"neighborCount"`
+	ChurnEvents       int    `json:"churnEvents"`
+	LastTransitionMs  int64  `json:"lastTransitionMs"`
+	InBackoff         bool   `json:"inBackoff"`
+}
+
+// BeaconPolicyResponse is returned by bramble.getBeaconPolicy.
+type BeaconPolicyResponse struct {
+	Config BeaconPolicyConfig `json:"config"`
+	Status BeaconPolicyStatus `json:"status"`
+}
+
+// SetBeaconPolicyParams contains params for bramble.setBeaconPolicy.
+type SetBeaconPolicyParams struct {
+	Enabled        *bool  `json:"enabled,omitempty"`
+	Mode           string `json:"mode,omitempty"`
+	BaseIntervalMs *int   `json:"baseIntervalMs,omitempty"`
+	MinIntervalMs  *int   `json:"minIntervalMs,omitempty"`
+	MaxIntervalMs  *int   `json:"maxIntervalMs,omitempty"`
+	DenseThreshold *int   `json:"denseThreshold,omitempty"`
+	ChurnThreshold *int   `json:"churnThreshold,omitempty"`
+	ChurnWindowMs  *int   `json:"churnWindowMs,omitempty"`
+}
+
+// BacklightResponse is returned by bramble.setBacklight.
+type BacklightResponse struct {
+	Level int `json:"level"`
+}
+
+// SleepResponse is returned by bramble.sleep.
+type SleepResponse struct {
+	OK         bool   `json:"ok"`
+	WakeAfterS int    `json:"wake_after_s,omitempty"`
+	Note       string `json:"note,omitempty"`
+}
+
+// AudioStatus is returned by bramble.getAudioStatus.
+type AudioStatus struct {
+	Available bool `json:"available"`
+	Volume    int  `json:"volume"`
+	Muted     bool `json:"muted"`
+	Playing   bool `json:"playing"`
+}
+
+// StorageInfo is returned by bramble.getStorageInfo.
+type StorageInfo struct {
+	SDPresent  bool   `json:"sd_present"`
+	MountPoint string `json:"mount_point,omitempty"`
+}
+
+// SetBroadcastTelemetryModeResponse is returned by bramble.setBroadcastTelemetryMode.
+type SetBroadcastTelemetryModeResponse struct {
+	OK                     bool   `json:"ok"`
+	BroadcastTelemetryMode string `json:"broadcast_telemetry_mode"`
+}
+
 // DiagnosticsHeap describes per-region heap metrics returned by bramble.getDiagnostics.
 type DiagnosticsHeap struct {
 	InternalFree             float64 `json:"internal_free"`

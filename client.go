@@ -177,6 +177,71 @@ func (c *Client) GetWifiStatus(ctx context.Context) (*WifiStatus, error) {
 	return &resp, nil
 }
 
+// GetBattery returns battery voltage in mV and charge percentage.
+func (c *Client) GetBattery(ctx context.Context) (*BatteryStatus, error) {
+	raw, err := c.proto.Call(ctx, "bramble.getBattery", nil)
+	if err != nil {
+		return nil, fmt.Errorf("bramble: get battery: %w", err)
+	}
+	var resp BatteryStatus
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode BatteryStatus: %w", err)
+	}
+	return &resp, nil
+}
+
+// GetGpsPosition returns current GPS position when available.
+func (c *Client) GetGpsPosition(ctx context.Context) (*GpsPosition, error) {
+	raw, err := c.proto.Call(ctx, "bramble.getGpsPosition", nil)
+	if err != nil {
+		return nil, fmt.Errorf("bramble: get gps position: %w", err)
+	}
+	var resp GpsPosition
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode GpsPosition: %w", err)
+	}
+	return &resp, nil
+}
+
+// GetBeaconPolicy returns beacon policy config and runtime status.
+func (c *Client) GetBeaconPolicy(ctx context.Context) (*BeaconPolicyResponse, error) {
+	raw, err := c.proto.Call(ctx, "bramble.getBeaconPolicy", nil)
+	if err != nil {
+		return nil, fmt.Errorf("bramble: get beacon policy: %w", err)
+	}
+	var resp BeaconPolicyResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode BeaconPolicyResponse: %w", err)
+	}
+	return &resp, nil
+}
+
+// GetAudioStatus returns current audio availability, volume, mute, and playback state.
+func (c *Client) GetAudioStatus(ctx context.Context) (*AudioStatus, error) {
+	raw, err := c.proto.Call(ctx, "bramble.getAudioStatus", nil)
+	if err != nil {
+		return nil, fmt.Errorf("bramble: get audio status: %w", err)
+	}
+	var resp AudioStatus
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode AudioStatus: %w", err)
+	}
+	return &resp, nil
+}
+
+// GetStorageInfo returns board storage status (e.g. SD card presence).
+func (c *Client) GetStorageInfo(ctx context.Context) (*StorageInfo, error) {
+	raw, err := c.proto.Call(ctx, "bramble.getStorageInfo", nil)
+	if err != nil {
+		return nil, fmt.Errorf("bramble: get storage info: %w", err)
+	}
+	var resp StorageInfo
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode StorageInfo: %w", err)
+	}
+	return &resp, nil
+}
+
 // GetDiagnostics returns runtime heap diagnostics and task stack high-water marks.
 func (c *Client) GetDiagnostics(ctx context.Context, includeHeapDump bool) (*DiagnosticsResponse, error) {
 	params := map[string]any{}
@@ -485,6 +550,94 @@ func (c *Client) SetNodeName(ctx context.Context, name string) error {
 		return err
 	}
 	return checkOK(raw, "setNodeName")
+}
+
+// SetAuthToken sets or clears the WebSocket auth token.
+func (c *Client) SetAuthToken(ctx context.Context, token string) error {
+	raw, err := c.proto.Call(ctx, "bramble.setAuthToken", map[string]string{"token": token})
+	if err != nil {
+		return err
+	}
+	return checkOK(raw, "setAuthToken")
+}
+
+// SetBroadcastTelemetryMode updates broadcast telemetry mode.
+func (c *Client) SetBroadcastTelemetryMode(ctx context.Context, mode string) (*SetBroadcastTelemetryModeResponse, error) {
+	raw, err := c.proto.Call(ctx, "bramble.setBroadcastTelemetryMode", map[string]string{"mode": mode})
+	if err != nil {
+		return nil, err
+	}
+	var resp SetBroadcastTelemetryModeResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode SetBroadcastTelemetryModeResponse: %w", err)
+	}
+	return &resp, nil
+}
+
+// SetBeaconPolicy updates adaptive beaconing policy settings.
+func (c *Client) SetBeaconPolicy(ctx context.Context, params SetBeaconPolicyParams) error {
+	raw, err := c.proto.Call(ctx, "bramble.setBeaconPolicy", params)
+	if err != nil {
+		return err
+	}
+	return checkOK(raw, "setBeaconPolicy")
+}
+
+// SetBacklight updates display backlight level (0-255).
+func (c *Client) SetBacklight(ctx context.Context, level int) (*BacklightResponse, error) {
+	raw, err := c.proto.Call(ctx, "bramble.setBacklight", map[string]int{"level": level})
+	if err != nil {
+		return nil, err
+	}
+	var resp BacklightResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode BacklightResponse: %w", err)
+	}
+	return &resp, nil
+}
+
+// Sleep enters deep sleep with optional timer wake.
+func (c *Client) Sleep(ctx context.Context, wakeAfterS int) (*SleepResponse, error) {
+	params := map[string]any{}
+	if wakeAfterS > 0 {
+		params["wake_after_s"] = wakeAfterS
+	}
+	raw, err := c.proto.Call(ctx, "bramble.sleep", params)
+	if err != nil {
+		return nil, err
+	}
+	var resp SleepResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode SleepResponse: %w", err)
+	}
+	return &resp, nil
+}
+
+// PlayTone plays a predefined audio tone.
+func (c *Client) PlayTone(ctx context.Context, tone string) error {
+	raw, err := c.proto.Call(ctx, "bramble.playTone", map[string]string{"tone": tone})
+	if err != nil {
+		return err
+	}
+	return checkOK(raw, "playTone")
+}
+
+// SetVolume sets output volume in range 0-100.
+func (c *Client) SetVolume(ctx context.Context, volume int) error {
+	raw, err := c.proto.Call(ctx, "bramble.setVolume", map[string]int{"volume": volume})
+	if err != nil {
+		return err
+	}
+	return checkOK(raw, "setVolume")
+}
+
+// SetMuted mutes or unmutes audio output.
+func (c *Client) SetMuted(ctx context.Context, muted bool) error {
+	raw, err := c.proto.Call(ctx, "bramble.setMuted", map[string]bool{"muted": muted})
+	if err != nil {
+		return err
+	}
+	return checkOK(raw, "setMuted")
 }
 
 // AddChannel adds a new channel with the given name and PSK.

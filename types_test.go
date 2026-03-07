@@ -211,6 +211,30 @@ func TestWrapAction(t *testing.T) {
 	}
 }
 
+func TestBeaconPolicyAndTelemetryJSONFieldNames(t *testing.T) {
+	base := 10000
+	params := SetBeaconPolicyParams{BaseIntervalMs: &base}
+	out, err := json.Marshal(params)
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	got := string(out)
+	if !contains(got, `"baseIntervalMs":10000`) {
+		t.Fatalf("expected camelCase beacon policy fields, got %s", got)
+	}
+	if contains(got, "base_interval_ms") {
+		t.Fatalf("unexpected snake_case beacon policy field, got %s", got)
+	}
+
+	var telemetry SetBroadcastTelemetryModeResponse
+	if err := json.Unmarshal([]byte(`{"ok":true,"broadcast_telemetry_mode":"recipient_only"}`), &telemetry); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if !telemetry.OK || telemetry.BroadcastTelemetryMode != "recipient_only" {
+		t.Fatalf("unexpected telemetry decode: %+v", telemetry)
+	}
+}
+
 func TestLocationEventTimestampMsSupportsInt64Range(t *testing.T) {
 	in := []byte(`{"event":"update","peer":"AABBCCDD","tier":1,"timestamp_ms":5000000000}`)
 	var ev LocationEvent
