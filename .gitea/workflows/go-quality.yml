@@ -1,6 +1,7 @@
 name: Go Quality
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - '**/*.go'
