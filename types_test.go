@@ -210,3 +210,14 @@ func TestWrapAction(t *testing.T) {
 		t.Fatalf("got %q want %q", got, want)
 	}
 }
+
+func TestLocationEventTimestampMsSupportsInt64Range(t *testing.T) {
+	in := []byte(`{"event":"update","peer":"AABBCCDD","tier":1,"timestamp_ms":5000000000}`)
+	var ev LocationEvent
+	if err := json.Unmarshal(in, &ev); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if ev.TimestampMs != 5000000000 {
+		t.Fatalf("expected TimestampMs=5000000000, got %d", ev.TimestampMs)
+	}
+}

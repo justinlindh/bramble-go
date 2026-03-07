@@ -169,14 +169,6 @@ type AirtimeStats struct {
 	Tiers []AirtimeTier `json:"tiers"`
 }
 
-// LocationContact is a location sharing contact configuration.
-type LocationContact struct {
-	Addr             string `json:"addr"`
-	Tier             string `json:"tier"`
-	IntervalSec      int    `json:"interval_sec"`
-	DistanceTriggerM int    `json:"distance_trigger_m"`
-}
-
 // LocationPeer holds location data for a peer node.
 type LocationPeer struct {
 	Addr          string    `json:"addr"`
@@ -239,7 +231,7 @@ type LocationEvent struct {
 	Event       string `json:"event"`
 	Peer        string `json:"peer,omitempty"`
 	Tier        int    `json:"tier"`
-	TimestampMs uint32 `json:"timestamp_ms"`
+	TimestampMs int64  `json:"timestamp_ms"`
 	RSSI        int    `json:"rssi,omitempty"`
 	SNR         int    `json:"snr,omitempty"`
 	Count       int    `json:"count,omitempty"`
