@@ -1,6 +1,7 @@
 name: Go Quality
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - '**/*.go'
@@ -32,10 +33,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: false
+        run: |
+          GO_VERSION=$(grep '^go ' go.mod | awk '{print $2}')
+          GOROOT="/opt/hostedtoolcache/go/${GO_VERSION}/x64"
+          if [ ! -x "$GOROOT/bin/go" ]; then
+            GOROOT="/tmp/go-sdk"
+            mkdir -p "$GOROOT"
+            curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+              | tar -xz -C "$GOROOT" --strip-components=1
+          fi
+          echo "GOROOT=$GOROOT" >> "$GITHUB_ENV"
+          echo "$GOROOT/bin" >> "$GITHUB_PATH"
+          "$GOROOT/bin/go" version
 
       - name: Prewarm module cache
         run: |
@@ -54,10 +63,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: false
+        run: |
+          GO_VERSION=$(grep '^go ' go.mod | awk '{print $2}')
+          GOROOT="/opt/hostedtoolcache/go/${GO_VERSION}/x64"
+          if [ ! -x "$GOROOT/bin/go" ]; then
+            GOROOT="/tmp/go-sdk"
+            mkdir -p "$GOROOT"
+            curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+              | tar -xz -C "$GOROOT" --strip-components=1
+          fi
+          echo "GOROOT=$GOROOT" >> "$GITHUB_ENV"
+          echo "$GOROOT/bin" >> "$GITHUB_PATH"
+          "$GOROOT/bin/go" version
 
       - name: Prewarm module cache
         run: |
@@ -76,10 +93,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: false
+        run: |
+          GO_VERSION=$(grep '^go ' go.mod | awk '{print $2}')
+          GOROOT="/opt/hostedtoolcache/go/${GO_VERSION}/x64"
+          if [ ! -x "$GOROOT/bin/go" ]; then
+            GOROOT="/tmp/go-sdk"
+            mkdir -p "$GOROOT"
+            curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+              | tar -xz -C "$GOROOT" --strip-components=1
+          fi
+          echo "GOROOT=$GOROOT" >> "$GITHUB_ENV"
+          echo "$GOROOT/bin" >> "$GITHUB_PATH"
+          "$GOROOT/bin/go" version
 
       - name: Prewarm module cache
         run: |
@@ -108,10 +133,18 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
-          cache: false
+        run: |
+          GO_VERSION=$(grep '^go ' go.mod | awk '{print $2}')
+          GOROOT="/opt/hostedtoolcache/go/${GO_VERSION}/x64"
+          if [ ! -x "$GOROOT/bin/go" ]; then
+            GOROOT="/tmp/go-sdk"
+            mkdir -p "$GOROOT"
+            curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+              | tar -xz -C "$GOROOT" --strip-components=1
+          fi
+          echo "GOROOT=$GOROOT" >> "$GITHUB_ENV"
+          echo "$GOROOT/bin" >> "$GITHUB_PATH"
+          "$GOROOT/bin/go" version
 
       - name: Prewarm module cache
         run: |
