@@ -105,6 +105,29 @@ func TestSerialSendReturnsErrReconnecting(t *testing.T) {
 	}
 }
 
+func TestSerialTransport_SetAuthToken(t *testing.T) {
+	s := NewSerial("/dev/fake")
+
+	if s.AuthToken != "" {
+		t.Fatalf("expected empty token by default, got %q", s.AuthToken)
+	}
+
+	s.SetAuthToken("token-1")
+	if s.AuthToken != "token-1" {
+		t.Fatalf("expected token-1, got %q", s.AuthToken)
+	}
+
+	s.SetAuthToken("token-2")
+	if s.AuthToken != "token-2" {
+		t.Fatalf("expected overwritten token-2, got %q", s.AuthToken)
+	}
+
+	s.SetAuthToken("")
+	if s.AuthToken != "" {
+		t.Fatalf("expected empty token, got %q", s.AuthToken)
+	}
+}
+
 func TestSerialReconnectStopsOnClose(t *testing.T) {
 	origOpen := serialOpenFunc
 	origSleep := serialSleep

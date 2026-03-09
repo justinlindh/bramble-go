@@ -60,6 +60,29 @@ func TestBLEInfo(t *testing.T) {
 	}
 }
 
+func TestBLETransport_SetAuthToken(t *testing.T) {
+	b := NewBLE(BLEConfig{})
+
+	if b.cfg.AuthToken != "" {
+		t.Fatalf("expected empty token by default, got %q", b.cfg.AuthToken)
+	}
+
+	b.SetAuthToken("token-1")
+	if b.cfg.AuthToken != "token-1" {
+		t.Fatalf("expected token-1, got %q", b.cfg.AuthToken)
+	}
+
+	b.SetAuthToken("token-2")
+	if b.cfg.AuthToken != "token-2" {
+		t.Fatalf("expected overwritten token-2, got %q", b.cfg.AuthToken)
+	}
+
+	b.SetAuthToken("")
+	if b.cfg.AuthToken != "" {
+		t.Fatalf("expected empty token, got %q", b.cfg.AuthToken)
+	}
+}
+
 func TestValidateAuthResponse(t *testing.T) {
 	if err := validateAuthResponse([]byte(`{"jsonrpc":"2.0","id":0,"result":{"ok":true}}`)); err != nil {
 		t.Fatalf("expected valid auth response, got %v", err)

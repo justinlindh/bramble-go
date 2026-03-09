@@ -15,6 +15,7 @@ type MockTransport struct {
 	connected bool
 	recvCh    chan []byte
 	queueSeq  int
+	authToken string
 }
 
 // NewMock creates a new MockTransport ready for use in tests.
@@ -113,8 +114,12 @@ func (m *MockTransport) IsConnected() bool {
 	return m.connected
 }
 
-// SetAuthToken is a no-op for the mock transport (satisfies the Transport interface).
-func (m *MockTransport) SetAuthToken(_ string) {}
+// SetAuthToken updates the mock transport auth token.
+func (m *MockTransport) SetAuthToken(token string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.authToken = token
+}
 
 // Ensure MockTransport implements Transport at compile time.
 var _ Transport = (*MockTransport)(nil)

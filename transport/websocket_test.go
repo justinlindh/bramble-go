@@ -119,6 +119,69 @@ func TestWebSocketConnectInitialDialSuccess(t *testing.T) {
 	defer w.Close()
 }
 
+func TestWebSocketTransport_SetAuthToken(t *testing.T) {
+	w := NewWebSocket("ws://example.invalid")
+
+	if w.AuthToken != "" {
+		t.Fatalf("expected empty token by default, got %q", w.AuthToken)
+	}
+
+	w.SetAuthToken("token-1")
+	if w.AuthToken != "token-1" {
+		t.Fatalf("expected token-1, got %q", w.AuthToken)
+	}
+
+	w.SetAuthToken("token-2")
+	if w.AuthToken != "token-2" {
+		t.Fatalf("expected overwritten token-2, got %q", w.AuthToken)
+	}
+
+	w.SetAuthToken("")
+	if w.AuthToken != "" {
+		t.Fatalf("expected empty token, got %q", w.AuthToken)
+	}
+}
+
+func TestWebSocketReconnect_UsesAuthTokenAfterSet(t *testing.T) {
+	origDial := websocketDialFunc
+	origSleep := websocketSleep
+	defer func() {
+		websocketDialFunc = origDial
+		websocketSleep = origSleep
+	}()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		c, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer c.Close(websocket.StatusNormalClosure, "ok")
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+	wsURL := "ws" + srv.URL[len("http"):]
+
+	var gotAuth string
+	websocketDialFunc = func(ctx context.Context, u string, opts *websocket.DialOptions) (*websocket.Conn, *http.Response, error) {
+		if opts != nil && opts.HTTPHeader != nil {
+			gotAuth = opts.HTTPHeader.Get("Authorization")
+		}
+		return websocket.Dial(ctx, u, opts)
+	}
+	websocketSleep = func(_ time.Duration) {}
+
+	w := NewWebSocket(wsURL)
+	w.SetAuthToken("reconnect-token")
+	if err := w.reconnect(); err != nil {
+		t.Fatalf("reconnect failed: %v", err)
+	}
+	defer w.Close()
+
+	if gotAuth != "Bearer reconnect-token" {
+		t.Fatalf("expected reconnect auth header, got %q", gotAuth)
+	}
+}
+
 func TestWebSocketConnectSetsAuthorizationHeader(t *testing.T) {
 	origDial := websocketDialFunc
 	defer func() { websocketDialFunc = origDial }()
