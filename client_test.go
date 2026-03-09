@@ -572,3 +572,28 @@ func TestClient_RPCError(t *testing.T) {
 		t.Fatal("expected error for RPC error response")
 	}
 }
+
+func TestClient_GetAuthToken(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"token":"pairing-token"}}`)
+	token, err := c.GetAuthToken(ctx)
+	if err != nil {
+		t.Fatalf("GetAuthToken error: %v", err)
+	}
+	if token != "pairing-token" {
+		t.Fatalf("token: got %q, want pairing-token", token)
+	}
+
+	sent := mock.Sent()
+	if len(sent) != 1 {
+		t.Fatalf("expected 1 sent request, got %d", len(sent))
+	}
+	if !strings.Contains(sent[0], `"method":"bramble.getAuthToken"`) {
+		t.Fatalf("expected bramble.getAuthToken request, got: %s", sent[0])
+	}
+}

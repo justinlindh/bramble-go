@@ -101,3 +101,26 @@ func TestMockTransportInfoAndMockError(t *testing.T) {
 		t.Fatalf("expected wrapped sentinel error, got %v", err)
 	}
 }
+
+func TestMockTransport_SetAuthToken(t *testing.T) {
+	m := NewMock()
+
+	if m.authToken != "" {
+		t.Fatalf("expected empty token by default, got %q", m.authToken)
+	}
+
+	m.SetAuthToken("token-1")
+	if m.authToken != "token-1" {
+		t.Fatalf("expected token-1, got %q", m.authToken)
+	}
+
+	m.SetAuthToken("token-2")
+	if m.authToken != "token-2" {
+		t.Fatalf("expected overwritten token-2, got %q", m.authToken)
+	}
+
+	m.SetAuthToken("")
+	if m.authToken != "" {
+		t.Fatalf("expected empty token, got %q", m.authToken)
+	}
+}
