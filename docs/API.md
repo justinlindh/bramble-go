@@ -61,7 +61,7 @@ fmt.Printf("delivery events replayed=%d\n", len(replay.Events))
 | `BroadcastOnChannelCritical(ctx, channel, text)` | `*SendResult` | Critical-priority broadcast on a specific channel |
 | `SendProbe(ctx)` | `*SendProbeResult` | Network reachability probe |
 | `SetRadio(ctx, config)` | `error` | Update radio parameters |
-| `SetNodeName(ctx, name)` | `error` | Set node display name (max 8 chars) |
+| `SetNodeName(ctx, name)` | `error` | Set node display name (max 32 chars) |
 | `AddChannel(ctx, name, psk)` | `*AddChannelResult` | Add a channel |
 | `RemoveChannel(ctx, index)` | `error` | Remove a channel by index |
 | `SetDefaultChannel(ctx, index)` | `error` | Set default outgoing channel |
