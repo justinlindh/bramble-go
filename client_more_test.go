@@ -57,8 +57,8 @@ func TestClient_DeliveryEvents_WithAndWithoutLimit(t *testing.T) {
 	}
 
 	sent := mock.Sent()
-	if len(sent) == 0 || !strings.Contains(sent[0], `"sinceEventSeq":5`) || !strings.Contains(sent[0], `"limit":25`) {
-		t.Fatalf("expected sinceEventSeq and limit in request, got %v", sent)
+	if len(sent) == 0 || !strings.Contains(sent[0], `"since_event_seq":5`) || !strings.Contains(sent[0], `"limit":25`) {
+		t.Fatalf("expected since_event_seq and limit in request, got %v", sent)
 	}
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":2,"result":{"events":[],"latest_event_seq":9}}`)
@@ -71,8 +71,8 @@ func TestClient_DeliveryEvents_WithAndWithoutLimit(t *testing.T) {
 	if len(sent) < 2 {
 		t.Fatalf("expected 2 requests, got %d", len(sent))
 	}
-	if !strings.Contains(sent[1], `"sinceEventSeq":8`) || strings.Contains(sent[1], `"limit"`) {
-		t.Fatalf("expected sinceEventSeq only, got %s", sent[1])
+	if !strings.Contains(sent[1], `"since_event_seq":8`) || strings.Contains(sent[1], `"limit"`) {
+		t.Fatalf("expected since_event_seq only, got %s", sent[1])
 	}
 }
 
