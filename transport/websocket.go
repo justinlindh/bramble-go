@@ -30,7 +30,7 @@ var (
 // returns ErrReconnecting. The Receive loop detects disconnects and drives reconnection.
 type WebSocket struct {
 	url       string
-	AuthToken string
+	authToken string
 	mu        sync.Mutex
 	conn      *websocket.Conn
 	done      chan struct{}
@@ -204,12 +204,12 @@ func (w *WebSocket) reconnect() error {
 }
 
 func (w *WebSocket) dialOptions() *websocket.DialOptions {
-	if w.AuthToken == "" {
+	if w.authToken == "" {
 		return nil
 	}
 
 	headers := make(http.Header)
-	headers.Set("Authorization", "Bearer "+w.AuthToken)
+	headers.Set("Authorization", "Bearer "+w.authToken)
 	return &websocket.DialOptions{HTTPHeader: headers}
 }
 
@@ -234,7 +234,12 @@ func (w *WebSocket) Info() string {
 
 // SetAuthToken sets the authentication token for the WebSocket transport.
 func (w *WebSocket) SetAuthToken(token string) {
-	w.AuthToken = token
+	w.authToken = token
+}
+
+// GetAuthToken returns the current authentication token for the WebSocket transport.
+func (w *WebSocket) GetAuthToken() string {
+	return w.authToken
 }
 
 // Ensure WebSocket implements Transport at compile time.

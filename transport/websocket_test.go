@@ -122,23 +122,23 @@ func TestWebSocketConnectInitialDialSuccess(t *testing.T) {
 func TestWebSocketTransport_SetAuthToken(t *testing.T) {
 	w := NewWebSocket("ws://example.invalid")
 
-	if w.AuthToken != "" {
-		t.Fatalf("expected empty token by default, got %q", w.AuthToken)
+	if w.authToken != "" {
+		t.Fatalf("expected empty token by default, got %q", w.authToken)
 	}
 
 	w.SetAuthToken("token-1")
-	if w.AuthToken != "token-1" {
-		t.Fatalf("expected token-1, got %q", w.AuthToken)
+	if w.authToken != "token-1" {
+		t.Fatalf("expected token-1, got %q", w.authToken)
 	}
 
 	w.SetAuthToken("token-2")
-	if w.AuthToken != "token-2" {
-		t.Fatalf("expected overwritten token-2, got %q", w.AuthToken)
+	if w.authToken != "token-2" {
+		t.Fatalf("expected overwritten token-2, got %q", w.authToken)
 	}
 
 	w.SetAuthToken("")
-	if w.AuthToken != "" {
-		t.Fatalf("expected empty token, got %q", w.AuthToken)
+	if w.authToken != "" {
+		t.Fatalf("expected empty token, got %q", w.authToken)
 	}
 }
 
@@ -195,7 +195,7 @@ func TestWebSocketConnectSetsAuthorizationHeader(t *testing.T) {
 	}
 
 	w := NewWebSocket("ws://example.invalid")
-	w.AuthToken = "secret-token"
+	w.authToken = "secret-token"
 	err := w.Connect(context.Background())
 	if err == nil {
 		t.Fatal("expected Connect error")

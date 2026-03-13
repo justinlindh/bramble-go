@@ -108,23 +108,23 @@ func TestSerialSendReturnsErrReconnecting(t *testing.T) {
 func TestSerialTransport_SetAuthToken(t *testing.T) {
 	s := NewSerial("/dev/fake")
 
-	if s.AuthToken != "" {
-		t.Fatalf("expected empty token by default, got %q", s.AuthToken)
+	if s.authToken != "" {
+		t.Fatalf("expected empty token by default, got %q", s.authToken)
 	}
 
 	s.SetAuthToken("token-1")
-	if s.AuthToken != "token-1" {
-		t.Fatalf("expected token-1, got %q", s.AuthToken)
+	if s.authToken != "token-1" {
+		t.Fatalf("expected token-1, got %q", s.authToken)
 	}
 
 	s.SetAuthToken("token-2")
-	if s.AuthToken != "token-2" {
-		t.Fatalf("expected overwritten token-2, got %q", s.AuthToken)
+	if s.authToken != "token-2" {
+		t.Fatalf("expected overwritten token-2, got %q", s.authToken)
 	}
 
 	s.SetAuthToken("")
-	if s.AuthToken != "" {
-		t.Fatalf("expected empty token, got %q", s.AuthToken)
+	if s.authToken != "" {
+		t.Fatalf("expected empty token, got %q", s.authToken)
 	}
 }
 
@@ -337,8 +337,8 @@ func TestSerialConnect_WithAuthAndReader(t *testing.T) {
 	}
 
 	s := NewSerial("/dev/fake", WithAuthToken("sekret"))
-	if s.AuthToken != "sekret" {
-		t.Fatalf("AuthToken: got %q, want sekret", s.AuthToken)
+	if s.authToken != "sekret" {
+		t.Fatalf("AuthToken: got %q, want sekret", s.authToken)
 	}
 
 	go func() {

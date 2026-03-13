@@ -41,8 +41,8 @@ func WithBaudRate(baud int) Option {
 // WithAuthToken sets the auth token used by transports that support authentication.
 func WithAuthToken(token string) Option {
 	return option{
-		serial:    func(s *Serial) { s.AuthToken = token },
-		websocket: func(w *WebSocket) { w.AuthToken = token },
+		serial:    func(s *Serial) { s.authToken = token },
+		websocket: func(w *WebSocket) { w.authToken = token },
 		ble:       func(b *BLE) { b.cfg.AuthToken = token },
 	}
 }
