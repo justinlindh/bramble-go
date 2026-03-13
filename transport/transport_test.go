@@ -113,7 +113,7 @@ func TestSerialInfo(t *testing.T) {
 // --- BLE additional tests ---
 
 func TestNewBLEConfig(t *testing.T) {
-	b := NewBLE(BLEConfig{DeviceName: "Bramble", ScanTimeout: 5e9})
+	b := NewBLE("Bramble", WithBLEScanTimeout(5e9))
 	if b.cfg.DeviceName != "Bramble" {
 		t.Fatalf("unexpected device name: %s", b.cfg.DeviceName)
 	}
@@ -126,14 +126,14 @@ func TestNewBLEConfig(t *testing.T) {
 }
 
 func TestNewBLEDefaultScanTimeout(t *testing.T) {
-	b := NewBLE(BLEConfig{})
+	b := NewBLE("")
 	if b.cfg.ScanTimeout != 10e9 {
 		t.Fatalf("expected 10s default, got %v", b.cfg.ScanTimeout)
 	}
 }
 
 func TestBLECloseIdempotent(t *testing.T) {
-	b := NewBLE(BLEConfig{})
+	b := NewBLE("")
 	// Not connected — Close should be no-op
 	if err := b.Close(); err != nil {
 		t.Fatalf("close when not connected: %v", err)

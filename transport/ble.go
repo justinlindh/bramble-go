@@ -49,17 +49,24 @@ type BLE struct {
 	closeCh   chan struct{}
 }
 
-// NewBLE creates a new BLE transport.
-func NewBLE(cfg BLEConfig) *BLE {
-	if cfg.ScanTimeout == 0 {
-		cfg.ScanTimeout = 10 * time.Second
-	}
-	return &BLE{
-		cfg:     cfg,
+// NewBLE creates a new BLE transport. The deviceName parameter specifies the
+// BLE device name to scan for (e.g. "Bramble"). Pass an empty string to
+// connect to the first device advertising the Nordic UART Service.
+// Use functional options (e.g. WithAuthToken) to configure the transport.
+func NewBLE(deviceName string, opts ...Option) *BLE {
+	b := &BLE{
+		cfg: BLEConfig{
+			DeviceName:  deviceName,
+			ScanTimeout: 10 * time.Second,
+		},
 		adapter: bluetooth.DefaultAdapter,
 		recvCh:  make(chan []byte, 32),
 		closeCh: make(chan struct{}),
 	}
+	for _, o := range opts {
+		o.applyBLE(b)
+	}
+	return b
 }
 
 // Connect scans for a Bramble device advertising NUS and connects.
