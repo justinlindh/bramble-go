@@ -288,7 +288,7 @@ func (c *Client) Version(ctx context.Context) (*VersionResponse, error) {
 
 // DeliveryEvents returns persisted delivery telemetry events since the given sequence.
 func (c *Client) DeliveryEvents(ctx context.Context, sinceEventSeq uint32, limit uint32) (*DeliveryReplayResponse, error) {
-	params := map[string]any{"sinceEventSeq": sinceEventSeq}
+	params := map[string]any{"since_event_seq": sinceEventSeq}
 	if limit > 0 {
 		params["limit"] = limit
 	}
