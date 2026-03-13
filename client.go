@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"sync"
 
 	"github.com/justinlindh/bramble-go/transport"
@@ -25,6 +26,7 @@ type Client struct {
 	onLocationEventFn     func(LocationEvent)
 	onProbeResultFn       func(ProbeResult)
 	onProbeCompleteFn     func(ProbeComplete)
+	onDecodeErrorFn       func(method string, err error, payload []byte)
 }
 
 // NewClient creates a new Client using the given transport.
@@ -61,6 +63,33 @@ func (c *Client) Close() error {
 	return c.t.Close()
 }
 
+// notifyDecodePayloadLimit is the maximum number of raw bytes included in
+// decode-error log entries and DecodeError callbacks.
+const notifyDecodePayloadLimit = 512
+
+// notifyDecode attempts to unmarshal params into dst. On failure it logs a
+// structured warning (including up to notifyDecodePayloadLimit bytes of the
+// raw payload) and invokes the optional decode-error callback. Returns true
+// when the decode succeeded.
+func (c *Client) notifyDecode(method string, params []byte, dst any, onErr func(string, error, []byte)) bool {
+	if err := json.Unmarshal(params, dst); err != nil {
+		snippet := params
+		if len(snippet) > notifyDecodePayloadLimit {
+			snippet = snippet[:notifyDecodePayloadLimit]
+		}
+		slog.Warn("bramble: notification decode error",
+			"method", method,
+			"error", err,
+			"payload", string(snippet),
+		)
+		if onErr != nil {
+			onErr(method, err, snippet)
+		}
+		return false
+	}
+	return true
+}
+
 // notifyLoop distributes incoming notifications to registered callbacks.
 func (c *Client) notifyLoop() {
 	for n := range c.proto.Notifications() {
@@ -75,20 +104,21 @@ func (c *Client) notifyLoop() {
 		onLocation := c.onLocationEventFn
 		onProbeResult := c.onProbeResultFn
 		onProbeComplete := c.onProbeCompleteFn
+		onDecodeError := c.onDecodeErrorFn
 		c.mu.Unlock()
 
 		switch n.Method {
 		case "bramble.onMessage":
 			if onMsg != nil {
 				var m Message
-				if json.Unmarshal(n.Params, &m) == nil {
+				if c.notifyDecode(n.Method, n.Params, &m, onDecodeError) {
 					onMsg(m)
 				}
 			}
 		case "bramble.onAck":
 			if onAck != nil {
 				var a Ack
-				if json.Unmarshal(n.Params, &a) == nil {
+				if c.notifyDecode(n.Method, n.Params, &a, onDecodeError) {
 					onAck(a)
 				}
 			}
@@ -99,49 +129,49 @@ func (c *Client) notifyLoop() {
 		case "bramble.onTrafficEvent":
 			if onTraffic != nil {
 				var evt TrafficEvent
-				if json.Unmarshal(n.Params, &evt) == nil {
+				if c.notifyDecode(n.Method, n.Params, &evt, onDecodeError) {
 					onTraffic(evt)
 				}
 			}
 		case "bramble.onBroadcastDelivery":
 			if onBroadcastDelivery != nil {
 				var evt BroadcastDelivery
-				if json.Unmarshal(n.Params, &evt) == nil {
+				if c.notifyDecode(n.Method, n.Params, &evt, onDecodeError) {
 					onBroadcastDelivery(evt)
 				}
 			}
 		case "bramble.onWifiEvent":
 			if onWifi != nil {
 				var evt WifiEvent
-				if json.Unmarshal(n.Params, &evt) == nil {
+				if c.notifyDecode(n.Method, n.Params, &evt, onDecodeError) {
 					onWifi(evt)
 				}
 			}
 		case "bramble.onGpsEvent":
 			if onGps != nil {
 				var evt GpsEvent
-				if json.Unmarshal(n.Params, &evt) == nil {
+				if c.notifyDecode(n.Method, n.Params, &evt, onDecodeError) {
 					onGps(evt)
 				}
 			}
 		case "bramble.onLocationEvent":
 			if onLocation != nil {
 				var evt LocationEvent
-				if json.Unmarshal(n.Params, &evt) == nil {
+				if c.notifyDecode(n.Method, n.Params, &evt, onDecodeError) {
 					onLocation(evt)
 				}
 			}
 		case "bramble.onProbeResult":
 			if onProbeResult != nil {
 				var evt ProbeResult
-				if json.Unmarshal(n.Params, &evt) == nil {
+				if c.notifyDecode(n.Method, n.Params, &evt, onDecodeError) {
 					onProbeResult(evt)
 				}
 			}
 		case "bramble.onProbeComplete":
 			if onProbeComplete != nil {
 				var evt ProbeComplete
-				if json.Unmarshal(n.Params, &evt) == nil {
+				if c.notifyDecode(n.Method, n.Params, &evt, onDecodeError) {
 					onProbeComplete(evt)
 				}
 			}
@@ -913,6 +943,17 @@ func (c *Client) OnGpsEvent(fn func(GpsEvent)) {
 func (c *Client) OnLocationEvent(fn func(LocationEvent)) {
 	c.mu.Lock()
 	c.onLocationEventFn = fn
+	c.mu.Unlock()
+}
+
+// OnDecodeError registers a callback invoked whenever a notification's JSON
+// payload cannot be decoded. The callback receives the notification method
+// name, the decode error, and up to notifyDecodePayloadLimit bytes of the raw
+// payload for debugging. The connection is not affected; the callback is purely
+// observational.
+func (c *Client) OnDecodeError(fn func(method string, err error, payload []byte)) {
+	c.mu.Lock()
+	c.onDecodeErrorFn = fn
 	c.mu.Unlock()
 }
 

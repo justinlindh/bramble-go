@@ -597,3 +597,84 @@ func TestClient_GetAuthToken(t *testing.T) {
 		t.Fatalf("expected bramble.getAuthToken request, got: %s", sent[0])
 	}
 }
+
+func TestClient_OnDecodeError_MalformedNotification(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	type decodeErr struct {
+		method  string
+		err     error
+		payload []byte
+	}
+	errCh := make(chan decodeErr, 10)
+	c.OnDecodeError(func(method string, err error, payload []byte) {
+		errCh <- decodeErr{method: method, err: err, payload: payload}
+	})
+
+	// Also register an OnMessage callback to confirm the connection stays alive
+	// after the malformed notification is processed.
+	goodMsg := make(chan Message, 1)
+	c.OnMessage(func(m Message) { goodMsg <- m })
+
+	// Inject a malformed bramble.onMessage notification (params is not an object).
+	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onMessage","params":"not-valid-json-for-message"}`)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	select {
+	case de := <-errCh:
+		if de.method != "bramble.onMessage" {
+			t.Errorf("method: got %q, want bramble.onMessage", de.method)
+		}
+		if de.err == nil {
+			t.Error("expected a non-nil decode error")
+		}
+		if len(de.payload) == 0 {
+			t.Error("expected non-empty payload in decode error callback")
+		}
+	case <-ctx.Done():
+		t.Fatal("timed out waiting for OnDecodeError callback")
+	}
+
+	// Connection must still be alive: a valid notification must arrive and fire its callback.
+	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onMessage","params":{"from":"AABBCCDD","to":"EEFF0011","text":"still alive","timestamp":1}}`)
+	select {
+	case m := <-goodMsg:
+		if m.Text != "still alive" {
+			t.Errorf("text: got %q, want still alive", m.Text)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for valid OnMessage callback after decode error")
+	}
+}
+
+func TestClient_OnDecodeError_PayloadTruncated(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer c.Close()
+
+	errCh := make(chan []byte, 1)
+	c.OnDecodeError(func(_ string, _ error, payload []byte) {
+		errCh <- payload
+	})
+	c.OnMessage(func(Message) {}) // register callback so decode is attempted
+
+	// Build a payload larger than the 512-byte limit.
+	longJunk := make([]byte, 600)
+	for i := range longJunk {
+		longJunk[i] = 'x'
+	}
+	// Wrap it as a JSON string (valid JSON, but wrong type for Message params).
+	bigPayload := `"` + string(longJunk) + `"`
+	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onMessage","params":` + bigPayload + `}`)
+
+	select {
+	case payload := <-errCh:
+		if len(payload) > 512 {
+			t.Errorf("payload snippet should be ≤512 bytes, got %d", len(payload))
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for OnDecodeError callback")
+	}
+}
