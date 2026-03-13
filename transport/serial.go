@@ -28,7 +28,7 @@ const defaultBaudRate = 115200
 type Serial struct {
 	port      string
 	baud      int
-	AuthToken string
+	authToken string
 	mu        sync.Mutex
 	conn      serial.Port
 	scanner   *bufio.Scanner
@@ -93,7 +93,7 @@ func (s *Serial) Connect(_ context.Context) error {
 }
 
 func (s *Serial) authenticate() error {
-	if s.AuthToken == "" {
+	if s.authToken == "" {
 		return nil
 	}
 
@@ -104,7 +104,7 @@ func (s *Serial) authenticate() error {
 }
 
 func (s *Serial) sendAuth() error {
-	msg := append(buildAuthRequest(s.AuthToken), '\n')
+	msg := append(buildAuthRequest(s.authToken), '\n')
 	_, err := s.conn.Write(msg)
 	if err != nil {
 		return fmt.Errorf("bramble/transport/serial: auth write: %w", err)
@@ -322,7 +322,12 @@ func (s *Serial) Info() string {
 
 // SetAuthToken sets the authentication token for the serial transport.
 func (s *Serial) SetAuthToken(token string) {
-	s.AuthToken = token
+	s.authToken = token
+}
+
+// GetAuthToken returns the current authentication token for the serial transport.
+func (s *Serial) GetAuthToken() string {
+	return s.authToken
 }
 
 // Ensure Serial implements Transport at compile time.

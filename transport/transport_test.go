@@ -25,8 +25,8 @@ func TestNewWebSocketConfig(t *testing.T) {
 	if w.url != "ws://192.168.4.1/ws" {
 		t.Fatalf("unexpected url: %s", w.url)
 	}
-	if w.AuthToken != "secret" {
-		t.Fatalf("unexpected auth token: %q", w.AuthToken)
+	if w.authToken != "secret" {
+		t.Fatalf("unexpected auth token: %q", w.authToken)
 	}
 	if w.done == nil {
 		t.Fatal("done channel should be initialized")
