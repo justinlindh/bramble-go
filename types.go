@@ -367,7 +367,9 @@ type SendResult struct {
 	MaxBytes       int    `json:"max_bytes,omitempty"`
 	ActualBytes    int    `json:"actual_bytes,omitempty"`
 	Broadcast      bool   `json:"broadcast,omitempty"`
-	Channel        int    `json:"channel,omitempty"`
+	// Channel is a pointer so callers can distinguish "no channel info" (nil)
+	// from "channel 0" (*Channel == 0). The zero value of int was ambiguous.
+	Channel *int `json:"channel,omitempty"`
 }
 
 // SendProbeResult is returned by bramble.sendProbe.

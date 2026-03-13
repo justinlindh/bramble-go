@@ -186,6 +186,65 @@ func TestAckUnmarshalFirmwareFormat(t *testing.T) {
 	}
 }
 
+func TestSendResultChannelPointerNilVsZero(t *testing.T) {
+	// When firmware omits the channel field entirely, Channel must be nil (no info).
+	noChannel := []byte(`{"status":"ok","packet_id":"AABB"}`)
+	var r1 SendResult
+	if err := json.Unmarshal(noChannel, &r1); err != nil {
+		t.Fatalf("unmarshal no-channel failed: %v", err)
+	}
+	if r1.Channel != nil {
+		t.Fatalf("expected nil Channel when field absent, got %v", *r1.Channel)
+	}
+
+	// When firmware sends channel:0, Channel must be non-nil pointing to 0.
+	chZero := []byte(`{"status":"ok","packet_id":"AABB","channel":0}`)
+	var r2 SendResult
+	if err := json.Unmarshal(chZero, &r2); err != nil {
+		t.Fatalf("unmarshal channel=0 failed: %v", err)
+	}
+	if r2.Channel == nil {
+		t.Fatal("expected non-nil Channel when field present with value 0")
+	}
+	if *r2.Channel != 0 {
+		t.Fatalf("expected *Channel=0, got %d", *r2.Channel)
+	}
+
+	// When firmware sends channel:3, Channel must be non-nil pointing to 3.
+	chThree := []byte(`{"status":"ok","packet_id":"AABB","channel":3}`)
+	var r3 SendResult
+	if err := json.Unmarshal(chThree, &r3); err != nil {
+		t.Fatalf("unmarshal channel=3 failed: %v", err)
+	}
+	if r3.Channel == nil {
+		t.Fatal("expected non-nil Channel when field present with value 3")
+	}
+	if *r3.Channel != 3 {
+		t.Fatalf("expected *Channel=3, got %d", *r3.Channel)
+	}
+
+	// Marshal: nil Channel must be omitted (omitempty).
+	r4 := SendResult{Status: "ok", PacketID: "AABB"}
+	out4, err := json.Marshal(r4)
+	if err != nil {
+		t.Fatalf("marshal nil-channel failed: %v", err)
+	}
+	if contains(string(out4), "channel") {
+		t.Fatalf("nil Channel should be omitted in JSON, got %s", out4)
+	}
+
+	// Marshal: *Channel == 0 must NOT be omitted (it is a valid value).
+	ch0 := 0
+	r5 := SendResult{Status: "ok", PacketID: "AABB", Channel: &ch0}
+	out5, err := json.Marshal(r5)
+	if err != nil {
+		t.Fatalf("marshal zero-channel failed: %v", err)
+	}
+	if !contains(string(out5), `"channel":0`) {
+		t.Fatalf("channel=0 should appear in JSON, got %s", out5)
+	}
+}
+
 func contains(s, sub string) bool { return strings.Contains(s, sub) }
 
 func TestMessageIsAction(t *testing.T) {
