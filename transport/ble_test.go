@@ -3,8 +3,11 @@ package transport
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
+
+	"tinygo.org/x/bluetooth"
 )
 
 func TestBLEOnNotificationAssemblesLines(t *testing.T) {
@@ -127,5 +130,75 @@ func TestValidateAuthResponse(t *testing.T) {
 	}
 	if err := validateAuthResponse([]byte(`{"jsonrpc":"2.0","id":0,"error":{"code":-32001,"message":"unauthorized"}}`)); err == nil {
 		t.Fatal("expected auth error response to fail")
+	}
+}
+
+// TestBLEAuthenticate_NoToken verifies that authenticate is a no-op when no
+// auth token is configured — it must return nil without touching BLE hardware.
+func TestBLEAuthenticate_NoToken(t *testing.T) {
+	b := NewBLE("")
+	if err := b.authenticate(context.Background()); err != nil {
+		t.Fatalf("expected nil with no auth token, got %v", err)
+	}
+}
+
+// TestBLEAuthenticate_SendFails verifies that authenticate wraps a Send error
+// as an "auth write" error. The transport is not connected, so Send returns
+// ErrNotConnected before any BLE hardware is accessed.
+func TestBLEAuthenticate_SendFails(t *testing.T) {
+	b := NewBLE("", WithAuthToken("secret-token"))
+	// b.connected is false — Send() returns ErrNotConnected
+	err := b.authenticate(context.Background())
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "auth write") {
+		t.Fatalf("expected 'auth write' in error, got: %v", err)
+	}
+	if !errors.Is(err, ErrNotConnected) {
+		t.Fatalf("expected ErrNotConnected wrapped in error, got: %v", err)
+	}
+}
+
+// TestBLEConnect_AdapterEnableFails verifies that Connect() propagates adapter
+// Enable() errors wrapped as "enable adapter". A non-existent adapter ID is
+// injected so Enable() fails deterministically without real BLE hardware.
+func TestBLEConnect_AdapterEnableFails(t *testing.T) {
+	b := NewBLE("")
+	b.adapter = bluetooth.NewAdapter("nonexistent-ble-adapter-test-99")
+	err := b.Connect(context.Background())
+	if err == nil {
+		t.Fatal("expected error from Connect() with non-existent adapter")
+	}
+	if !strings.Contains(err.Error(), "enable adapter") {
+		t.Fatalf("expected 'enable adapter' in error, got: %v", err)
+	}
+}
+
+// TestBLEReceive_ContextCancel verifies that Receive returns context.Canceled
+// when the context is already cancelled on entry.
+func TestBLEReceive_ContextCancel(t *testing.T) {
+	b := NewBLE("")
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := b.Receive(ctx)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+}
+
+// TestBLEOnNotification_DropsWhenFull verifies that onNotification silently
+// drops complete lines when recvCh is at capacity (no panic, no block).
+func TestBLEOnNotification_DropsWhenFull(t *testing.T) {
+	b := NewBLE("")
+	// Fill the channel to capacity.
+	for i := 0; i < cap(b.recvCh); i++ {
+		b.recvCh <- []byte("msg")
+	}
+	// Sending another complete line should not block or panic.
+	b.onNotification([]byte("overflow\n"))
+	// Channel must remain exactly at capacity (message was dropped).
+	if got := len(b.recvCh); got != cap(b.recvCh) {
+		t.Fatalf("expected channel len %d == cap %d after drop, got %d", cap(b.recvCh), cap(b.recvCh), got)
 	}
 }
