@@ -428,6 +428,10 @@ func TestClient_OnLocationEvent(t *testing.T) {
 		if evt.Event != "received" || evt.Peer != "AABBCCDD" {
 			t.Fatalf("unexpected location event: %+v", evt)
 		}
+		// Firmware sends tier as integer 1 — SDK should decode to "coarse".
+		if evt.Tier != LocationTierCoarse {
+			t.Fatalf("expected tier=%q, got %q", LocationTierCoarse, evt.Tier)
+		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for OnLocationEvent callback")
 	}

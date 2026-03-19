@@ -307,7 +307,7 @@ func TestClient_TrafficDebugMethodsAndCallbacks(t *testing.T) {
 	c.OnTrafficEvent(func(te TrafficEvent) { trafficCh <- te })
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onProbeResult","params":{"address":"AABBCCDD","hops":1,"rssi":-70,"snr":7.5,"latency_ms":40,"probe_round":2,"probe_id":"AA"}}`)
-	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onProbeComplete","params":{"probe_id":170}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onProbeComplete","params":{"probe_id":"000000AA","unique_count":1,"duration_ms":5000,"rounds_total":3}}`)
 	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onTrafficEvent","params":{"seq":9,"timestamp_ms":999,"pkt_type":2,"category":"routing","airtime_tier":"critical","packet_len":12,"rssi":-90,"is_tx":false}}`)
 
 	select {
@@ -320,7 +320,7 @@ func TestClient_TrafficDebugMethodsAndCallbacks(t *testing.T) {
 	}
 	select {
 	case p := <-completeCh:
-		if p.ProbeID != 170 {
+		if p.ProbeID != "000000AA" || p.UniqueCount != 1 || p.DurationMs != 5000 || p.RoundsTotal != 3 {
 			t.Fatalf("bad probe complete: %+v", p)
 		}
 	case <-ctx.Done():
