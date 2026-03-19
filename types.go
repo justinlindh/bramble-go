@@ -2,7 +2,10 @@
 // It communicates using JSON-RPC 2.0 over serial (UART), WebSocket, or BLE.
 package bramble
 
-import "strings"
+import (
+	"encoding/json"
+	"strings"
+)
 
 // Position represents a GPS fix with accuracy and motion data.
 type Position struct {
@@ -57,8 +60,11 @@ type GpsPosition struct {
 	SpeedKmh   float64 `json:"speed_kmh,omitempty"`
 	HeadingDeg float64 `json:"heading_deg,omitempty"`
 	AccuracyM  float64 `json:"accuracy_m,omitempty"`
-	Timestamp  int64   `json:"timestamp,omitempty"`
-	Valid      bool    `json:"valid"`
+	// Timestamp is the GPS fix time as Unix epoch seconds.
+	// Note: unlike other SDK fields which use _ms suffixes for milliseconds,
+	// the firmware returns this as whole seconds with the wire key "timestamp".
+	Timestamp int64 `json:"timestamp,omitempty"`
+	Valid     bool  `json:"valid"`
 }
 
 // BeaconPolicyConfig is the config section returned by bramble.getBeaconPolicy.
@@ -316,15 +322,62 @@ type GpsEvent struct {
 	Sats  int     `json:"sats,omitempty"`
 }
 
+// LocationTier represents a location privacy tier.
+type LocationTier string
+
+const (
+	// LocationTierFull shares full position (lat/lon/alt/speed/heading).
+	LocationTierFull LocationTier = "full"
+	// LocationTierCoarse shares approximate position (~1km grid).
+	LocationTierCoarse LocationTier = "coarse"
+	// LocationTierPresence shares online/offline only.
+	LocationTierPresence LocationTier = "presence"
+)
+
+// locationTierFromInt converts a firmware uint8 tier enum to a LocationTier string.
+// The firmware onLocationEvent notification sends tier as a raw integer while
+// all other RPC methods send it as a string — this bridges the inconsistency.
+func locationTierFromInt(v int) LocationTier {
+	switch v {
+	case 0:
+		return LocationTierFull
+	case 1:
+		return LocationTierCoarse
+	case 2:
+		return LocationTierPresence
+	default:
+		return LocationTierCoarse
+	}
+}
+
+// UnmarshalJSON handles both string ("full") and integer (0) representations
+// of the tier field. The firmware onLocationEvent notification sends an integer
+// while all other RPC methods send a string.
+func (t *LocationTier) UnmarshalJSON(data []byte) error {
+	// Try string first.
+	var s string
+	if json.Unmarshal(data, &s) == nil {
+		*t = LocationTier(s)
+		return nil
+	}
+	// Fall back to integer.
+	var v int
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*t = locationTierFromInt(v)
+	return nil
+}
+
 // LocationEvent is delivered via bramble.onLocationEvent notifications.
 type LocationEvent struct {
-	Event       string `json:"event"`
-	Peer        string `json:"peer,omitempty"`
-	Tier        int    `json:"tier"`
-	TimestampMs int64  `json:"timestamp_ms"`
-	RSSI        int    `json:"rssi,omitempty"`
-	SNR         int    `json:"snr,omitempty"`
-	Count       int    `json:"count,omitempty"`
+	Event       string       `json:"event"`
+	Peer        string       `json:"peer,omitempty"`
+	Tier        LocationTier `json:"tier"`
+	TimestampMs int64        `json:"timestamp_ms"`
+	RSSI        int          `json:"rssi,omitempty"`
+	SNR         int          `json:"snr,omitempty"`
+	Count       int          `json:"count,omitempty"`
 }
 
 // ProbeResult is delivered via bramble.onProbeResult notifications.
@@ -341,9 +394,24 @@ type ProbeResult struct {
 	ProbeID string `json:"probe_id,omitempty"`
 }
 
+// ProbeResponder is a single responder entry in a ProbeComplete notification.
+type ProbeResponder struct {
+	Address   string  `json:"address"`
+	Hops      int     `json:"hops"`
+	RSSI      int     `json:"rssi"`
+	SNR       float64 `json:"snr"`
+	LatencyMs int64   `json:"latency_ms"`
+	SeenRounds int    `json:"seen_rounds"`
+}
+
 // ProbeComplete is delivered when a probe window closes.
 type ProbeComplete struct {
-	ProbeID int `json:"probe_id"`
+	// ProbeID is a hex string (e.g. "A1B2C3D4").
+	ProbeID     string           `json:"probe_id"`
+	UniqueCount int              `json:"unique_count"`
+	DurationMs  int64            `json:"duration_ms"`
+	RoundsTotal int              `json:"rounds_total"`
+	Responders  []ProbeResponder `json:"responders,omitempty"`
 }
 
 // LocationUpdate is delivered via location.update notifications.
@@ -427,12 +495,26 @@ type ConfigRadio struct {
 
 // RadioConfig contains the radio parameters for bramble.setRadio.
 // All fields are optional pointers; nil means leave unchanged.
+//
+// Field names and units match the firmware wire format:
+//   - BwHz: bandwidth in Hz (e.g. 125000), matching ConfigRadio.BwHz
+//   - FrequencyMhz: frequency in MHz (e.g. 915.0), matching ConfigRadio.FrequencyMhz
+//
+// Deprecated aliases BwKhz and FreqMhz are retained for backward compatibility
+// but should not be used in new code.
 type RadioConfig struct {
-	TxPowerDbm *int     `json:"tx_power_dbm,omitempty"`
-	SF         *int     `json:"sf,omitempty"`
-	BwKhz      *int     `json:"bw_khz,omitempty"`
-	CR         *int     `json:"cr,omitempty"`
-	FreqMhz    *float64 `json:"freq_mhz,omitempty"`
+	TxPowerDbm   *int     `json:"tx_power_dbm,omitempty"`
+	SF           *int     `json:"sf,omitempty"`
+	BwHz         *int     `json:"bw_hz,omitempty"`
+	CR           *int     `json:"cr,omitempty"`
+	FrequencyMhz *float64 `json:"frequency_mhz,omitempty"`
+
+	// Deprecated: Use BwHz (Hz) instead. BwKhz is retained for backward
+	// compatibility; if both are set, BwHz takes precedence.
+	BwKhz *int `json:"bw_khz,omitempty"`
+	// Deprecated: Use FrequencyMhz instead. FreqMhz is retained for backward
+	// compatibility; if both are set, FrequencyMhz takes precedence.
+	FreqMhz *float64 `json:"freq_mhz,omitempty"`
 }
 
 // LocationContactRule is a per-peer location sharing policy rule.

@@ -556,13 +556,19 @@ func (c *Client) SetRadio(ctx context.Context, config RadioConfig) error {
 	if config.SF != nil {
 		params["sf"] = *config.SF
 	}
-	if config.BwKhz != nil {
+	if config.BwHz != nil {
+		params["bw_hz"] = *config.BwHz
+	} else if config.BwKhz != nil {
+		// Deprecated path: convert kHz → Hz for firmware.
 		params["bw_hz"] = *config.BwKhz * 1000
 	}
 	if config.CR != nil {
 		params["coding_rate"] = *config.CR
 	}
-	if config.FreqMhz != nil {
+	if config.FrequencyMhz != nil {
+		params["frequency_mhz"] = *config.FrequencyMhz
+	} else if config.FreqMhz != nil {
+		// Deprecated path: same unit, just aliased field name.
 		params["frequency_mhz"] = *config.FreqMhz
 	}
 
@@ -573,7 +579,7 @@ func (c *Client) SetRadio(ctx context.Context, config RadioConfig) error {
 	return checkOK(raw, "setRadio")
 }
 
-// SetNodeName sets the node display name (max 8 characters).
+// SetNodeName sets the node display name (max 32 characters).
 func (c *Client) SetNodeName(ctx context.Context, name string) error {
 	raw, err := c.proto.Call(ctx, "bramble.setNodeName", map[string]string{"name": name})
 	if err != nil {
