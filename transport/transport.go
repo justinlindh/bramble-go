@@ -29,6 +29,9 @@ type Transport interface {
 	// SetAuthToken configures the authentication token used during connection.
 	// Must be called before Connect.
 	SetAuthToken(token string)
+
+	// GetAuthToken returns the currently configured authentication token.
+	GetAuthToken() string
 }
 
 // AuthConfig contains optional authentication settings shared by transports.

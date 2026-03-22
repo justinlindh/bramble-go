@@ -121,6 +121,13 @@ func (m *MockTransport) SetAuthToken(token string) {
 	m.authToken = token
 }
 
+// GetAuthToken returns the current mock transport auth token.
+func (m *MockTransport) GetAuthToken() string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.authToken
+}
+
 // Ensure MockTransport implements Transport at compile time.
 var _ Transport = (*MockTransport)(nil)
 
