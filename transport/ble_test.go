@@ -39,6 +39,14 @@ func TestBLESendNotConnected(t *testing.T) {
 	}
 }
 
+func TestBLESendReconnecting(t *testing.T) {
+	b := NewBLE("")
+	b.reconnecting = true
+	if err := b.Send([]byte("{}")); !errors.Is(err, ErrReconnecting) {
+		t.Fatalf("expected ErrReconnecting, got %v", err)
+	}
+}
+
 func TestBLEReceiveClosed(t *testing.T) {
 	b := NewBLE("")
 	close(b.closeCh)
@@ -52,6 +60,41 @@ func TestBLEConnectAlreadyConnected(t *testing.T) {
 	b.connected = true
 	if err := b.Connect(context.Background()); err == nil {
 		t.Fatal("expected already connected error")
+	}
+}
+
+func TestBLEDisconnectReconnectCallbacks(t *testing.T) {
+	b := NewBLE("")
+	b.connected = true
+
+	disconnectCalled := 0
+	reconnectCalled := 0
+	b.OnDisconnect = func() { disconnectCalled++ }
+	b.OnReconnect = func() { reconnectCalled++ }
+
+	b.handleConnectionStateChange(false)
+	if disconnectCalled != 1 {
+		t.Fatalf("expected disconnect callback once, got %d", disconnectCalled)
+	}
+
+	b.reconnecting = false
+	b.handleConnectionStateChange(true)
+	if reconnectCalled != 1 {
+		t.Fatalf("expected reconnect callback once, got %d", reconnectCalled)
+	}
+}
+
+func TestBLEHandleDisconnectClosesTransport(t *testing.T) {
+	b := NewBLE("")
+	b.connected = true
+
+	b.handleConnectionStateChange(false)
+
+	if b.connected {
+		t.Fatal("expected transport disconnected")
+	}
+	if _, err := b.Receive(context.Background()); !errors.Is(err, ErrClosed) {
+		t.Fatalf("expected ErrClosed after disconnect, got %v", err)
 	}
 }
 
