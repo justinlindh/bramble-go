@@ -54,7 +54,7 @@ type Notification struct {
 type Protocol struct {
 	t        transport.Transport
 	nextID   atomic.Int64
-	pending  sync.Map       // int64 -> chan *rpcResponse
+	pending  sync.Map // int64 -> chan *rpcResponse
 	notifyCh chan Notification
 	done     chan struct{}
 	once     sync.Once
@@ -108,7 +108,7 @@ func (p *Protocol) reader() {
 			continue
 		}
 
-		isResponse := msg.ID != nil && msg.Method == "" // result or error reply
+		isResponse := msg.ID != nil && msg.Method == ""     // result or error reply
 		isNotification := msg.Method != "" && msg.ID == nil // server-pushed event
 
 		if isResponse {
@@ -150,7 +150,7 @@ func (p *Protocol) Call(ctx context.Context, method string, params any) (json.Ra
 	defer p.pending.Delete(id)
 
 	for {
-		err := p.t.Send(data)
+		err := p.t.Send(ctx, data)
 		if err == nil {
 			break
 		}

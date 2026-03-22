@@ -34,7 +34,7 @@ func (m *MockTransport) Connect(_ context.Context) error {
 }
 
 // Send records the outgoing payload for later inspection via Sent().
-func (m *MockTransport) Send(data []byte) error {
+func (m *MockTransport) Send(_ context.Context, data []byte) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if !m.connected {
@@ -137,6 +137,6 @@ func NewMockError(sendErr error) *MockTransportError {
 }
 
 // Send always returns the configured error.
-func (m *MockTransportError) Send(_ []byte) error {
+func (m *MockTransportError) Send(_ context.Context, _ []byte) error {
 	return fmt.Errorf("mock send error: %w", m.SendErr)
 }

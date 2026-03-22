@@ -74,7 +74,7 @@ func (w *WebSocket) Connect(ctx context.Context) error {
 }
 
 // Send encodes a JSON payload as a single WebSocket text message.
-func (w *WebSocket) Send(data []byte) error {
+func (w *WebSocket) Send(ctx context.Context, data []byte) error {
 	w.mu.Lock()
 	conn := w.conn
 	reconnecting := w.reconnecting
@@ -87,7 +87,6 @@ func (w *WebSocket) Send(data []byte) error {
 		return ErrNotConnected
 	}
 
-	ctx := context.Background()
 	if err := websocketWriteFunc(conn, ctx, data); err != nil {
 		if shouldReconnectWriteErr(err) {
 			go func() { _ = w.reconnect() }()

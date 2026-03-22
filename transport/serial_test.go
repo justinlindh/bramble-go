@@ -100,7 +100,7 @@ func TestSerialReconnectBackoffAndCallbacks(t *testing.T) {
 func TestSerialSendReturnsErrReconnecting(t *testing.T) {
 	s := NewSerial("/dev/fake")
 	s.reconnecting = true
-	if err := s.Send([]byte(`{"id":1}`)); !errors.Is(err, ErrReconnecting) {
+	if err := s.Send(context.Background(), []byte(`{"id":1}`)); !errors.Is(err, ErrReconnecting) {
 		t.Fatalf("expected ErrReconnecting, got %v", err)
 	}
 }
@@ -162,7 +162,7 @@ func TestSerialSendSuccessAndNotConnected(t *testing.T) {
 		conn := &fakeSerialPort{}
 		s.conn = conn
 
-		if err := s.Send([]byte(`{"id":1}`)); err != nil {
+		if err := s.Send(context.Background(), []byte(`{"id":1}`)); err != nil {
 			t.Fatalf("Send error: %v", err)
 		}
 
@@ -178,7 +178,7 @@ func TestSerialSendSuccessAndNotConnected(t *testing.T) {
 
 	t.Run("not connected", func(t *testing.T) {
 		s := NewSerial("/dev/fake")
-		if err := s.Send([]byte(`{"id":1}`)); !errors.Is(err, ErrNotConnected) {
+		if err := s.Send(context.Background(), []byte(`{"id":1}`)); !errors.Is(err, ErrNotConnected) {
 			t.Fatalf("expected ErrNotConnected, got %v", err)
 		}
 	})
@@ -267,12 +267,12 @@ func newPipeSerialPort() *pipeSerialPort {
 }
 
 func (p *pipeSerialPort) SetMode(_ *serial.Mode) error { return nil }
-func (p *pipeSerialPort) Read(b []byte) (int, error) { return p.pr.Read(b) }
-func (p *pipeSerialPort) Drain() error { return nil }
-func (p *pipeSerialPort) ResetInputBuffer() error { return nil }
-func (p *pipeSerialPort) ResetOutputBuffer() error { return nil }
-func (p *pipeSerialPort) SetDTR(_ bool) error { return nil }
-func (p *pipeSerialPort) SetRTS(_ bool) error { return nil }
+func (p *pipeSerialPort) Read(b []byte) (int, error)   { return p.pr.Read(b) }
+func (p *pipeSerialPort) Drain() error                 { return nil }
+func (p *pipeSerialPort) ResetInputBuffer() error      { return nil }
+func (p *pipeSerialPort) ResetOutputBuffer() error     { return nil }
+func (p *pipeSerialPort) SetDTR(_ bool) error          { return nil }
+func (p *pipeSerialPort) SetRTS(_ bool) error          { return nil }
 func (p *pipeSerialPort) GetModemStatusBits() (*serial.ModemStatusBits, error) {
 	return &serial.ModemStatusBits{}, nil
 }
