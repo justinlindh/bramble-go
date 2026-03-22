@@ -47,7 +47,7 @@ func TestRadioConfigMarshalPointers(t *testing.T) {
 }
 
 func TestLocationPeerUnmarshalOptionalPosition(t *testing.T) {
-	withPos := []byte(`{"addr":"ABCDEF01","name":"n","tier":"normal","online":true,"last_updated_ms":5,"position":{"lat":1,"lon":2,"alt":3,"accuracy":4,"timestamp_ms":6}}`)
+	withPos := []byte(`{"addr":"ABCDEF01","name":"n","tier":"coarse","online":true,"last_updated_ms":5,"position":{"lat":1,"lon":2,"alt":3,"accuracy":4,"timestamp_ms":6}}`)
 	var lp LocationPeer
 	if err := json.Unmarshal(withPos, &lp); err != nil {
 		t.Fatalf("unmarshal with position failed: %v", err)
@@ -59,7 +59,7 @@ func TestLocationPeerUnmarshalOptionalPosition(t *testing.T) {
 		t.Fatalf("expected addr string hex, got %q", lp.Addr)
 	}
 
-	withoutPos := []byte(`{"addr":"ABCDEF01","name":"n","tier":"normal","online":false,"last_updated_ms":5}`)
+	withoutPos := []byte(`{"addr":"ABCDEF01","name":"n","tier":"coarse","online":false,"last_updated_ms":5}`)
 	var lpNoPos LocationPeer
 	if err := json.Unmarshal(withoutPos, &lpNoPos); err != nil {
 		t.Fatalf("unmarshal without position failed: %v", err)
@@ -71,7 +71,7 @@ func TestLocationPeerUnmarshalOptionalPosition(t *testing.T) {
 
 func TestLocationConfigMarshalCanonicalFieldNames(t *testing.T) {
 	enabled := true
-	defaultTier := "critical"
+	defaultTier := "full"
 	intervalS := 90
 	source := "gps"
 	cfg := LocationConfig{
@@ -85,7 +85,7 @@ func TestLocationConfigMarshalCanonicalFieldNames(t *testing.T) {
 		t.Fatalf("marshal failed: %v", err)
 	}
 	got := string(out)
-	if !contains(got, `"default_tier":"critical"`) || !contains(got, `"interval_s":90`) || !contains(got, `"source":"gps"`) {
+	if !contains(got, `"default_tier":"full"`) || !contains(got, `"interval_s":90`) || !contains(got, `"source":"gps"`) {
 		t.Fatalf("missing canonical location fields: %s", got)
 	}
 	if contains(got, `"tier"`) {

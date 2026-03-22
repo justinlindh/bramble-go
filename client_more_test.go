@@ -31,7 +31,7 @@ func TestClient_QueryMethodsCoverage(t *testing.T) {
 		t.Fatalf("Messages failed: msgs=%+v err=%v", msgs, err)
 	}
 
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":4,"result":{"peerLocations":[{"addr":"CAFEBABE","name":"peer","tier":"normal","online":true,"last_updated_ms":42}]}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":4,"result":{"peerLocations":[{"addr":"CAFEBABE","name":"peer","tier":"coarse","online":true,"last_updated_ms":42}]}}`)
 	peers, err := c.PeerLocations(ctx)
 	if err != nil || len(peers) != 1 || peers[0].Addr != "CAFEBABE" {
 		t.Fatalf("PeerLocations failed: peers=%+v err=%v", peers, err)
@@ -116,19 +116,27 @@ func TestClient_ActionAndConfigMethodsCoverage(t *testing.T) {
 		t.Fatalf("SetMailbox: %v", err)
 	}
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":8,"result":{"ok":true}}`)
-	if err := c.SetLocationContact(ctx, 0xAABBCCDD, "normal"); err != nil { t.Fatalf("SetLocationContact: %v", err) }
+	if err := c.SetLocationContact(ctx, 0xAABBCCDD, "full"); err != nil {
+		t.Fatalf("SetLocationContact: %v", err)
+	}
 	enabled := false
 	interval := 900
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":9,"result":{"ok":true}}`)
-	if err := c.SetLocationContact(ctx, 0xAABBCCDD, "normal", LocationContactRule{Enabled: &enabled, IntervalS: &interval}); err != nil {
+	if err := c.SetLocationContact(ctx, 0xAABBCCDD, "coarse", LocationContactRule{Enabled: &enabled, IntervalS: &interval}); err != nil {
 		t.Fatalf("SetLocationContact with rule override: %v", err)
 	}
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":10,"result":{"ok":true}}`)
-	if err := c.RemoveLocationContact(ctx, 0xAABBCCDD); err != nil { t.Fatalf("RemoveLocationContact: %v", err) }
+	if err := c.RemoveLocationContact(ctx, 0xAABBCCDD); err != nil {
+		t.Fatalf("RemoveLocationContact: %v", err)
+	}
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":11,"result":{"ok":true}}`)
-	if err := c.ShareLocationOnce(ctx, 0xAABBCCDD); err != nil { t.Fatalf("ShareLocationOnce: %v", err) }
+	if err := c.ShareLocationOnce(ctx, 0xAABBCCDD); err != nil {
+		t.Fatalf("ShareLocationOnce: %v", err)
+	}
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":12,"result":{"ok":true}}`)
-	if err := c.Reboot(ctx); err != nil { t.Fatalf("Reboot: %v", err) }
+	if err := c.Reboot(ctx); err != nil {
+		t.Fatalf("Reboot: %v", err)
+	}
 
 	sent := strings.Join(mock.Sent(), "\n")
 	for _, want := range []string{

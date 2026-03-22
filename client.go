@@ -746,14 +746,14 @@ func (c *Client) SetLocationConfig(ctx context.Context, config LocationConfig) e
 //
 // Backward-compatible usage keeps the original addr+tier arguments:
 //
-//	_ = c.SetLocationContact(ctx, 0xAABBCCDD, "normal")
+//	_ = c.SetLocationContact(ctx, 0xAABBCCDD, "full")
 //
 // To set additional optional firmware-supported fields (enabled, interval_s),
 // pass a LocationContactRule override as the variadic 4th argument:
 //
 //	enabled := false
 //	interval := 300
-//	_ = c.SetLocationContact(ctx, 0xAABBCCDD, "normal", LocationContactRule{Enabled: &enabled, IntervalS: &interval})
+//	_ = c.SetLocationContact(ctx, 0xAABBCCDD, "coarse", LocationContactRule{Enabled: &enabled, IntervalS: &interval})
 func (c *Client) SetLocationContact(ctx context.Context, addr uint32, tier string, overrides ...LocationContactRule) error {
 	payload := map[string]any{
 		"address": fmt.Sprintf("%08X", addr),
