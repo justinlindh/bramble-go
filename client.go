@@ -471,7 +471,7 @@ func (c *Client) SendBroadcastCritical(ctx context.Context, text string) (*SendR
 }
 
 // Broadcast sends a text message to all peers on the public channel.
-// Deprecated: prefer SendBroadcast.
+// Deprecated: Broadcast is a legacy alias kept for compatibility. Use SendBroadcast instead.
 func (c *Client) Broadcast(ctx context.Context, text string) (*SendResult, error) {
 	return c.SendBroadcast(ctx, text)
 }
