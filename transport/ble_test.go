@@ -130,6 +130,19 @@ func TestBLETransport_SetAuthToken(t *testing.T) {
 	}
 }
 
+func TestBLETransport_GetAuthToken(t *testing.T) {
+	b := NewBLE("")
+
+	if got := b.GetAuthToken(); got != "" {
+		t.Fatalf("expected empty token by default, got %q", got)
+	}
+
+	b.SetAuthToken("ble-token")
+	if got := b.GetAuthToken(); got != "ble-token" {
+		t.Fatalf("expected ble-token, got %q", got)
+	}
+}
+
 func TestBLENewBLE_WithAuthToken(t *testing.T) {
 	b := NewBLE("Bramble", WithAuthToken("secret"))
 	if b.cfg.AuthToken != "secret" {

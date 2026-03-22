@@ -393,6 +393,12 @@ func (b *BLE) SetAuthToken(token string) {
 	b.cfg.AuthToken = token
 }
 
+// GetAuthToken returns the currently configured BLE authentication token.
+// BLE uses the same auth JSON-RPC negotiation as Serial, over the NUS transport.
+func (b *BLE) GetAuthToken() string {
+	return b.cfg.AuthToken
+}
+
 // Info returns a description of the BLE transport.
 func (b *BLE) Info() string {
 	if b.cfg.DeviceName != "" {
