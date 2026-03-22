@@ -28,7 +28,7 @@ func TestMockTransportConnectAndClose(t *testing.T) {
 
 func TestMockTransportSendWhenDisconnected(t *testing.T) {
 	m := NewMock()
-	if err := m.Send([]byte(`{"x":1}`)); !errors.Is(err, ErrNotConnected) {
+	if err := m.Send(context.Background(), []byte(`{"x":1}`)); !errors.Is(err, ErrNotConnected) {
 		t.Fatalf("expected ErrNotConnected, got %v", err)
 	}
 }
@@ -47,10 +47,10 @@ func TestMockTransportQueueResponseOrderingAndSent(t *testing.T) {
 	m := NewMock()
 	_ = m.Connect(context.Background())
 
-	if err := m.Send([]byte(`one`)); err != nil {
+	if err := m.Send(context.Background(), []byte(`one`)); err != nil {
 		t.Fatalf("Send one: %v", err)
 	}
-	if err := m.Send([]byte(`two`)); err != nil {
+	if err := m.Send(context.Background(), []byte(`two`)); err != nil {
 		t.Fatalf("Send two: %v", err)
 	}
 	sent := m.Sent()
@@ -96,7 +96,7 @@ func TestMockTransportInfoAndMockError(t *testing.T) {
 
 	sentinel := errors.New("boom")
 	me := NewMockError(sentinel)
-	err := me.Send([]byte("x"))
+	err := me.Send(context.Background(), []byte("x"))
 	if err == nil || !errors.Is(err, sentinel) {
 		t.Fatalf("expected wrapped sentinel error, got %v", err)
 	}

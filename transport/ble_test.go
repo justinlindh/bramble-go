@@ -34,7 +34,7 @@ func TestBLEOnNotificationAssemblesLines(t *testing.T) {
 
 func TestBLESendNotConnected(t *testing.T) {
 	b := NewBLE("")
-	if err := b.Send([]byte("{}")); !errors.Is(err, ErrNotConnected) {
+	if err := b.Send(context.Background(), []byte("{}")); !errors.Is(err, ErrNotConnected) {
 		t.Fatalf("expected ErrNotConnected, got %v", err)
 	}
 }

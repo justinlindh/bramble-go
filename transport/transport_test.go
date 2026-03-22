@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"context"
 	"errors"
 	"testing"
 )
@@ -38,7 +39,7 @@ func TestNewWebSocketConfig(t *testing.T) {
 
 func TestWebSocketSendNotConnected(t *testing.T) {
 	w := NewWebSocket("ws://example.invalid")
-	if err := w.Send([]byte("{}")); !errors.Is(err, ErrNotConnected) {
+	if err := w.Send(context.Background(), []byte("{}")); !errors.Is(err, ErrNotConnected) {
 		t.Fatalf("expected ErrNotConnected, got %v", err)
 	}
 }
@@ -84,7 +85,7 @@ func TestNewSerialWithBaudRate(t *testing.T) {
 
 func TestSerialSendNotConnected(t *testing.T) {
 	s := NewSerial("/dev/fake")
-	if err := s.Send([]byte("{}")); !errors.Is(err, ErrNotConnected) {
+	if err := s.Send(context.Background(), []byte("{}")); !errors.Is(err, ErrNotConnected) {
 		t.Fatalf("expected ErrNotConnected, got %v", err)
 	}
 }

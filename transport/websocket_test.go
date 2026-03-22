@@ -70,8 +70,29 @@ func TestWebSocketReconnectBackoffAndCallbacks(t *testing.T) {
 func TestWebSocketSendWhenReconnecting(t *testing.T) {
 	w := NewWebSocket("ws://example.invalid")
 	w.reconnecting = true
-	if err := w.Send([]byte("{}")); !errors.Is(err, ErrReconnecting) {
+	if err := w.Send(context.Background(), []byte("{}")); !errors.Is(err, ErrReconnecting) {
 		t.Fatalf("expected ErrReconnecting, got %v", err)
+	}
+}
+
+func TestWebSocketSendUsesCallerContext(t *testing.T) {
+	origWrite := websocketWriteFunc
+	defer func() { websocketWriteFunc = origWrite }()
+
+	wantCtx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	websocketWriteFunc = func(_ *websocket.Conn, gotCtx context.Context, _ []byte) error {
+		if gotCtx != wantCtx {
+			t.Fatalf("expected Send to pass caller context")
+		}
+		return nil
+	}
+
+	w := NewWebSocket("ws://example.invalid")
+	w.conn = &websocket.Conn{}
+	if err := w.Send(wantCtx, []byte(`{"hello":"world"}`)); err != nil {
+		t.Fatalf("Send: %v", err)
 	}
 }
 
@@ -237,7 +258,7 @@ func TestWebSocketSendReturnsReconnectingOnClosedConnection(t *testing.T) {
 
 	w := NewWebSocket("ws://example.invalid")
 	w.conn = &websocket.Conn{}
-	if err := w.Send([]byte(`{"hello":"world"}`)); !errors.Is(err, ErrReconnecting) {
+	if err := w.Send(context.Background(), []byte(`{"hello":"world"}`)); !errors.Is(err, ErrReconnecting) {
 		t.Fatalf("expected ErrReconnecting, got %v", err)
 	}
 }
@@ -267,7 +288,7 @@ func TestWebSocketSendAndReceiveSuccess(t *testing.T) {
 	}
 	defer w.Close()
 
-	if err := w.Send([]byte(`{"hello":"world"}`)); err != nil {
+	if err := w.Send(context.Background(), []byte(`{"hello":"world"}`)); err != nil {
 		t.Fatalf("Send: %v", err)
 	}
 

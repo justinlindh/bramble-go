@@ -164,7 +164,7 @@ func (f *flakyReconnectTransport) Close() error                  { return nil }
 func (f *flakyReconnectTransport) Info() string                  { return "flaky" }
 func (f *flakyReconnectTransport) SetAuthToken(_ string)         {}
 
-func (f *flakyReconnectTransport) Send(_ []byte) error {
+func (f *flakyReconnectTransport) Send(_ context.Context, _ []byte) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sends++

@@ -267,7 +267,7 @@ func (s *Serial) reconnect() error {
 }
 
 // Send writes a JSON payload followed by a newline to the serial port.
-func (s *Serial) Send(data []byte) error {
+func (s *Serial) Send(_ context.Context, data []byte) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

@@ -183,7 +183,7 @@ func (b *BLE) authenticate(ctx context.Context) error {
 		return nil
 	}
 
-	if err := b.Send(buildAuthRequest(b.cfg.AuthToken)); err != nil {
+	if err := b.Send(ctx, buildAuthRequest(b.cfg.AuthToken)); err != nil {
 		return fmt.Errorf("bramble/transport/ble: auth write: %w", err)
 	}
 
@@ -219,7 +219,7 @@ func (b *BLE) onNotification(data []byte) {
 }
 
 // Send writes a JSON-RPC message to the device, chunked to BLE MTU.
-func (b *BLE) Send(data []byte) error {
+func (b *BLE) Send(_ context.Context, data []byte) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 

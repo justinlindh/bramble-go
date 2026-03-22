@@ -14,7 +14,7 @@ type Transport interface {
 	Connect(ctx context.Context) error
 
 	// Send sends a raw JSON byte payload to the node.
-	Send(data []byte) error
+	Send(ctx context.Context, data []byte) error
 
 	// Receive blocks until a complete JSON-RPC message is available,
 	// the context is cancelled, or an error occurs.
