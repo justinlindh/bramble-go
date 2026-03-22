@@ -11,6 +11,8 @@ import (
 	"tinygo.org/x/bluetooth"
 )
 
+var bleSleep = time.Sleep
+
 // NUS (Nordic UART Service) UUIDs — must match firmware ble_server.c
 var (
 	nusServiceUUID = bluetooth.NewUUID([16]byte{
@@ -38,15 +40,23 @@ type BLEConfig struct {
 
 // BLE implements Transport over BLE using the Nordic UART Service.
 type BLE struct {
-	cfg       BLEConfig
-	adapter   *bluetooth.Adapter
-	device    bluetooth.Device
-	txChar    bluetooth.DeviceCharacteristic
-	connected bool
-	mu        sync.Mutex
-	recvCh    chan []byte
-	lineBuf   strings.Builder
-	closeCh   chan struct{}
+	cfg          BLEConfig
+	adapter      *bluetooth.Adapter
+	device       bluetooth.Device
+	txChar       bluetooth.DeviceCharacteristic
+	connected    bool
+	mu           sync.Mutex
+	recvCh       chan []byte
+	lineBuf      strings.Builder
+	closeCh      chan struct{}
+	reconnecting bool
+	closing      bool
+
+	// OnDisconnect is called (if non-nil) when the BLE link is lost unexpectedly.
+	OnDisconnect func()
+
+	// OnReconnect is called (if non-nil) after a successful automatic reconnect.
+	OnReconnect func()
 }
 
 // NewBLE creates a new BLE transport. The deviceName parameter specifies the
@@ -72,18 +82,22 @@ func NewBLE(deviceName string, opts ...Option) *BLE {
 // Connect scans for a Bramble device advertising NUS and connects.
 func (b *BLE) Connect(ctx context.Context) error {
 	b.mu.Lock()
-	defer b.mu.Unlock()
-
 	if b.connected {
+		b.mu.Unlock()
 		return errors.New("bramble/transport/ble: already connected")
 	}
+	b.closing = false
+	b.mu.Unlock()
 
-	// Enable the BLE adapter
+	return b.connect(ctx)
+}
+
+func (b *BLE) connect(ctx context.Context) error {
+	// Enable the BLE adapter.
 	if err := b.adapter.Enable(); err != nil {
 		return fmt.Errorf("bramble/transport/ble: enable adapter: %w", err)
 	}
 
-	// Scan for the device
 	var foundAddr bluetooth.Address
 	var foundName string
 	scanDone := make(chan struct{})
@@ -95,13 +109,11 @@ func (b *BLE) Connect(ctx context.Context) error {
 		_ = b.adapter.Scan(func(adapter *bluetooth.Adapter, result bluetooth.ScanResult) {
 			name := result.LocalName()
 
-			// Match by name if specified, otherwise match any NUS device
 			if b.cfg.DeviceName != "" {
 				if !strings.Contains(strings.ToLower(name), strings.ToLower(b.cfg.DeviceName)) {
 					return
 				}
 			} else {
-				// Check if device advertises NUS service
 				hasNUS := false
 				for _, uuid := range result.AdvertisementPayload.ServiceUUIDs() {
 					if uuid == nusServiceUUID {
@@ -117,60 +129,71 @@ func (b *BLE) Connect(ctx context.Context) error {
 			foundAddr = result.Address
 			foundName = name
 			_ = adapter.StopScan()
-			close(scanDone)
+			select {
+			case <-scanDone:
+			default:
+				close(scanDone)
+			}
 		})
 	}()
 
 	select {
 	case <-scanDone:
-		// Found device
 	case <-scanCtx.Done():
 		_ = b.adapter.StopScan()
 		return fmt.Errorf("bramble/transport/ble: scan timeout (no device found in %v)", b.cfg.ScanTimeout)
 	}
 
-	// Connect to the device
 	device, err := b.adapter.Connect(foundAddr, bluetooth.ConnectionParams{})
 	if err != nil {
 		return fmt.Errorf("bramble/transport/ble: connect to %s (%s): %w", foundName, foundAddr.String(), err)
 	}
-	b.device = device
 
-	// Discover NUS service
+	// Install connection state handler for disconnect/reconnect hooks.
+	b.adapter.SetConnectHandler(func(d bluetooth.Device, connected bool) {
+		if d.Address != foundAddr {
+			return
+		}
+		b.handleConnectionStateChange(connected)
+	})
+
 	svcs, err := device.DiscoverServices([]bluetooth.UUID{nusServiceUUID})
 	if err != nil || len(svcs) == 0 {
-		device.Disconnect()
+		_ = device.Disconnect()
 		return fmt.Errorf("bramble/transport/ble: NUS service not found on %s", foundName)
 	}
 
-	// Discover characteristics
 	chars, err := svcs[0].DiscoverCharacteristics([]bluetooth.UUID{nusTXUUID, nusRXUUID})
 	if err != nil || len(chars) < 2 {
-		device.Disconnect()
+		_ = device.Disconnect()
 		return fmt.Errorf("bramble/transport/ble: NUS characteristics not found (got %d)", len(chars))
 	}
 
-	// Identify TX and RX by UUID
+	var tx bluetooth.DeviceCharacteristic
 	for _, c := range chars {
 		uuid := c.UUID()
 		if uuid == nusTXUUID {
-			b.txChar = c
+			tx = c
 		} else if uuid == nusRXUUID {
-			// Enable notifications on RX characteristic
-			err = c.EnableNotifications(b.onNotification)
-			if err != nil {
-				device.Disconnect()
+			if err := c.EnableNotifications(b.onNotification); err != nil {
+				_ = device.Disconnect()
 				return fmt.Errorf("bramble/transport/ble: enable RX notifications: %w", err)
 			}
 		}
 	}
 
+	b.mu.Lock()
+	b.device = device
+	b.txChar = tx
 	b.connected = true
-	b.closeCh = make(chan struct{})
+	if b.isCloseChClosed() {
+		b.closeCh = make(chan struct{})
+	}
+	b.mu.Unlock()
 
 	if err := b.authenticate(ctx); err != nil {
 		_ = device.Disconnect()
-		b.connected = false
+		b.handleConnectionStateChange(false)
 		return err
 	}
 
@@ -218,11 +241,96 @@ func (b *BLE) onNotification(data []byte) {
 	}
 }
 
+func (b *BLE) isCloseChClosed() bool {
+	select {
+	case <-b.closeCh:
+		return true
+	default:
+		return false
+	}
+}
+
+func (b *BLE) handleConnectionStateChange(connected bool) {
+	b.mu.Lock()
+	wasConnected := b.connected
+	if connected {
+		b.connected = true
+		reconnecting := b.reconnecting
+		onReconnect := b.OnReconnect
+		b.mu.Unlock()
+		if onReconnect != nil && !wasConnected && !reconnecting {
+			onReconnect()
+		}
+		return
+	}
+
+	if !wasConnected {
+		b.mu.Unlock()
+		return
+	}
+
+	b.connected = false
+	shouldReconnect := !b.closing && !b.reconnecting
+	onDisconnect := b.OnDisconnect
+	if !b.isCloseChClosed() {
+		close(b.closeCh)
+	}
+	if shouldReconnect {
+		b.reconnecting = true
+	}
+	b.mu.Unlock()
+
+	if onDisconnect != nil {
+		onDisconnect()
+	}
+	if shouldReconnect {
+		go b.reconnectLoop()
+	}
+}
+
+func (b *BLE) reconnectLoop() {
+	delay := time.Second
+	const maxDelay = 30 * time.Second
+
+	for {
+		b.mu.Lock()
+		if b.closing {
+			b.reconnecting = false
+			b.mu.Unlock()
+			return
+		}
+		b.mu.Unlock()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		err := b.connect(ctx)
+		cancel()
+		if err == nil {
+			b.mu.Lock()
+			b.reconnecting = false
+			onReconnect := b.OnReconnect
+			b.mu.Unlock()
+			if onReconnect != nil {
+				onReconnect()
+			}
+			return
+		}
+
+		bleSleep(delay)
+		delay *= 2
+		if delay > maxDelay {
+			delay = maxDelay
+		}
+	}
+}
+
 // Send writes a JSON-RPC message to the device, chunked to BLE MTU.
 func (b *BLE) Send(data []byte) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	if b.reconnecting {
+		return ErrReconnecting
+	}
 	if !b.connected {
 		return ErrNotConnected
 	}
@@ -263,12 +371,19 @@ func (b *BLE) Close() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
+	b.closing = true
+	b.reconnecting = false
 	if !b.connected {
+		if !b.isCloseChClosed() {
+			close(b.closeCh)
+		}
 		return nil
 	}
 
 	b.connected = false
-	close(b.closeCh)
+	if !b.isCloseChClosed() {
+		close(b.closeCh)
+	}
 	return b.device.Disconnect()
 }
 
