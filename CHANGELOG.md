@@ -7,6 +7,37 @@ and this project follows [Conventional Commits](https://www.conventionalcommits.
 
 ## [Unreleased]
 
+### Added
+
+- feat(transport): refactor NewBLE to accept functional Option pattern (7727862)
+- feat(client): add GetAuthToken() for serial pairing (c87e892)
+- transport: add SetAuthToken to Transport interface (cf16d63)
+- Add Go SDK wrappers for missing firmware RPC methods — GetBattery, GetGpsPosition, GetBeaconPolicy, SetBeaconPolicy, GetAudioStatus, GetStorageInfo, SetBroadcastTelemetryMode, SetBacklight, Sleep, PlayTone, SetVolume, SetMuted, OnDecodeError (0745504)
+- feat(client): expose full setLocationContact fields (a6254bf)
+- feat(transport): share auth option across serial and websocket (e840898)
+- test(transport): add BLE auth handshake and Connect coverage (b812954)
+- test(transport): cover auth token setters across transports (5b3e4c3)
+
+### Fixed
+
+- fix(transport): add BLE GetAuthToken for transport symmetry (f3f1f9d)
+- fix(location): align sdk location tier examples and fixtures (932e9e6)
+- fix(transport): add BLE disconnect and reconnect hooks (5526497)
+- fix(transport): propagate caller context through Send (5fc68b8)
+- fix(client): format Broadcast deprecation as godoc (3a53db8)
+- fix(sdk): address audit findings C31-C34, C37 (274ad0d)
+- fix(notify): log JSON decode errors in notifyLoop with payload context (57ac99b)
+- fix(types): change SendResult.Channel from int to *int (a9bf28f)
+- fix(client): use snake_case since_event_seq param in DeliveryEvents (d6e17ef)
+- fix(types): remove unused LocationContact and prevent LocationEvent timestamp overflow (2e0fa73)
+- Fix IsCompatible semver comparison for protocol versions (5b96306)
+
+### Changed
+
+- refactor(transport): make auth token fields unexported across all transports (943740c)
+- build: bump Go minimum to 1.26.1 (6a2c871)
+- docs: fix SetNodeName max chars (8→32), add examples README (be22584)
+
 ## [2026-03-01]
 
 _Changes captured from `git log --oneline --since=2026-02-01`._
