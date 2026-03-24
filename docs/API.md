@@ -37,6 +37,12 @@ All methods accept a `context.Context` for timeout/cancellation.
 | `Config(ctx)` | `*ConfigResponse` | Full node config (name, address, radio, channels) |
 | `GetTrafficDebug(ctx)` | `*GetTrafficDebugResponse` | Current traffic debug config and ring-buffer state |
 | `GetTrafficEvents(ctx, params)` | `*GetTrafficEventsResponse` | Pull traffic debug events from ring buffer |
+| `GetBattery(ctx)` | `*BatteryStatus` | Battery voltage (mV) and charge percentage |
+| `GetGpsPosition(ctx)` | `*GpsPosition` | Current GPS fix (lat/lon/alt/speed/heading/accuracy) |
+| `GetBeaconPolicy(ctx)` | `*BeaconPolicyResponse` | Adaptive beacon policy config and runtime status |
+| `GetAudioStatus(ctx)` | `*AudioStatus` | Audio availability, volume, mute, and playback state |
+| `GetStorageInfo(ctx)` | `*StorageInfo` | Board storage status (SD card presence and mount point) |
+| `GetAuthToken(ctx)` | `(string, error)` | Retrieve the device's WebSocket auth token (typically over serial) |
 
 ### Query Usage Examples
 
@@ -46,6 +52,27 @@ fmt.Printf("wifi mode=%s ssid=%s ip=%s\n", wifi.Mode, wifi.SSID, wifi.IP)
 
 replay, _ := client.DeliveryEvents(ctx, 0, 100)
 fmt.Printf("delivery events replayed=%d\n", len(replay.Events))
+
+bat, _ := client.GetBattery(ctx)
+fmt.Printf("battery %dmV (%d%%)\n", bat.VoltageMV, bat.Percentage)
+
+pos, _ := client.GetGpsPosition(ctx)
+if pos.Valid {
+    fmt.Printf("GPS lat=%.6f lon=%.6f alt=%.1fm\n", pos.Lat, pos.Lon, pos.Alt)
+}
+
+beacon, _ := client.GetBeaconPolicy(ctx)
+fmt.Printf("beacon mode=%s interval=%dms\n", beacon.Status.ActiveMode, beacon.Status.CurrentIntervalMs)
+
+audio, _ := client.GetAudioStatus(ctx)
+fmt.Printf("audio available=%v volume=%d muted=%v\n", audio.Available, audio.Volume, audio.Muted)
+
+storage, _ := client.GetStorageInfo(ctx)
+fmt.Printf("SD present=%v mount=%s\n", storage.SDPresent, storage.MountPoint)
+
+// Retrieve auth token over serial before connecting via WebSocket
+token, _ := client.GetAuthToken(ctx)
+fmt.Println("auth token:", token)
 ```
 
 ## Action Methods
@@ -73,6 +100,14 @@ fmt.Printf("delivery events replayed=%d\n", len(replay.Events))
 | `Reboot(ctx)` | `error` | Reboot node |
 | `OTAUpdate(ctx, url)` | `*OTAUpdateResponse` | Trigger OTA update from firmware URL |
 | `SetTrafficDebug(ctx, params)` | `*SetTrafficDebugResponse` | Configure traffic debug telemetry capture |
+| `SetBeaconPolicy(ctx, params)` | `error` | Update adaptive beaconing policy settings |
+| `SetAuthToken(ctx, token)` | `error` | Set or clear the device's WebSocket auth token |
+| `SetBroadcastTelemetryMode(ctx, mode)` | `*SetBroadcastTelemetryModeResponse` | Update broadcast telemetry mode |
+| `SetBacklight(ctx, level)` | `*BacklightResponse` | Set display backlight level (0–255) |
+| `Sleep(ctx, wakeAfterS)` | `*SleepResponse` | Enter deep sleep; wake after `wakeAfterS` seconds (0 = no timer) |
+| `PlayTone(ctx, tone)` | `error` | Play a predefined audio tone by name |
+| `SetVolume(ctx, volume)` | `error` | Set output volume (0–100) |
+| `SetMuted(ctx, muted)` | `error` | Mute or unmute audio output |
 
 ### Action and Debug Usage Examples
 
@@ -95,6 +130,32 @@ state, _ := client.GetTrafficDebug(ctx)
 fmt.Println("traffic debug enabled:", state.Enabled)
 events, _ := client.GetTrafficEvents(ctx, bramble.GetTrafficEventsParams{})
 fmt.Println("events:", events.Returned)
+
+// Beacon policy: read then update
+bp, _ := client.GetBeaconPolicy(ctx)
+fmt.Println("beacon active mode:", bp.Status.ActiveMode)
+enabled := true
+base := 5000
+_ = client.SetBeaconPolicy(ctx, bramble.SetBeaconPolicyParams{Enabled: &enabled, BaseIntervalMs: &base})
+
+// Auth token round-trip (read over serial, apply to WS client)
+token, _ := client.GetAuthToken(ctx)
+_ = client.SetAuthToken(ctx, token)
+
+// Broadcast telemetry mode
+result, _ := client.SetBroadcastTelemetryMode(ctx, "full")
+fmt.Println("telemetry mode:", result.BroadcastTelemetryMode)
+
+// Backlight and sleep
+bl, _ := client.SetBacklight(ctx, 128)
+fmt.Println("backlight level:", bl.Level)
+sr, _ := client.Sleep(ctx, 300) // wake after 5 min
+fmt.Println("sleep scheduled:", sr.OK)
+
+// Audio controls
+_ = client.PlayTone(ctx, "startup")
+_ = client.SetVolume(ctx, 75)
+_ = client.SetMuted(ctx, false)
 ```
 
 ## Notification Callbacks
@@ -111,6 +172,7 @@ fmt.Println("events:", events.Returned)
 | `OnWifiEvent(fn)` | `func(WifiEvent)` | Wi-Fi state change notifications |
 | `OnGpsEvent(fn)` | `func(GpsEvent)` | GPS state/position notifications |
 | `OnLocationEvent(fn)` | `func(LocationEvent)` | Location sharing event notifications |
+| `OnDecodeError(fn)` | `func(method string, err error, payload []byte)` | Called when a notification's JSON payload cannot be decoded |
 
 ```go
 client.OnMessage(func(m bramble.Message) {
@@ -127,6 +189,10 @@ client.OnProbeResult(func(p bramble.ProbeResult) {
 
 client.OnTrafficEvent(func(e bramble.TrafficEvent) {
     fmt.Printf("Traffic seq=%d tx=%t len=%d category=%s\n", e.Seq, e.IsTx, e.PacketLen, e.Category)
+})
+
+client.OnDecodeError(func(method string, err error, payload []byte) {
+    log.Printf("decode error on %s: %v (raw: %s)\n", method, err, payload)
 })
 ```
 
