@@ -26,12 +26,38 @@ type Client struct {
 	onLocationEventFn     func(LocationEvent)
 	onProbeResultFn       func(ProbeResult)
 	onProbeCompleteFn     func(ProbeComplete)
+	onPeerLocationFn      func(PeerLocationEvent)
+	onIdentityChangeFn    func(IdentityChangeEvent)
 	onDecodeErrorFn       func(method string, err error, payload []byte)
 }
 
+// ClientOption is a functional option for NewClient.
+type ClientOption func(*Client)
+
+// WithOnPeerLocation returns a ClientOption that registers a callback invoked
+// whenever a bramble.onPeerLocation notification arrives. The firmware sends
+// this notification with no payload when a peer location update is received.
+// Callers should call PeerLocations to fetch the current data.
+func WithOnPeerLocation(fn func(PeerLocationEvent)) ClientOption {
+	return func(c *Client) { c.onPeerLocationFn = fn }
+}
+
+// WithOnIdentityChange returns a ClientOption that registers a callback invoked
+// whenever a bramble.onIdentityChange notification arrives. The firmware sends
+// this after regenerating the node identity due to an address collision.
+func WithOnIdentityChange(fn func(IdentityChangeEvent)) ClientOption {
+	return func(c *Client) { c.onIdentityChangeFn = fn }
+}
+
 // NewClient creates a new Client using the given transport.
-func NewClient(t transport.Transport) *Client {
-	return &Client{t: t}
+// Optional ClientOption values (e.g. WithOnPeerLocation, WithOnIdentityChange)
+// may be supplied to register callbacks before Connect is called.
+func NewClient(t transport.Transport, opts ...ClientOption) *Client {
+	c := &Client{t: t}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 // Connect establishes the transport connection, starts the protocol reader,
@@ -104,6 +130,8 @@ func (c *Client) notifyLoop() {
 		onLocation := c.onLocationEventFn
 		onProbeResult := c.onProbeResultFn
 		onProbeComplete := c.onProbeCompleteFn
+		onPeerLocation := c.onPeerLocationFn
+		onIdentityChange := c.onIdentityChangeFn
 		onDecodeError := c.onDecodeErrorFn
 		c.mu.Unlock()
 
@@ -173,6 +201,18 @@ func (c *Client) notifyLoop() {
 				var evt ProbeComplete
 				if c.notifyDecode(n.Method, n.Params, &evt, onDecodeError) {
 					onProbeComplete(evt)
+				}
+			}
+		case "bramble.onPeerLocation":
+			// Firmware sends null params; no decoding needed.
+			if onPeerLocation != nil {
+				onPeerLocation(PeerLocationEvent{})
+			}
+		case "bramble.onIdentityChange":
+			if onIdentityChange != nil {
+				var evt IdentityChangeEvent
+				if c.notifyDecode(n.Method, n.Params, &evt, onDecodeError) {
+					onIdentityChange(evt)
 				}
 			}
 		}
@@ -949,6 +989,25 @@ func (c *Client) OnGpsEvent(fn func(GpsEvent)) {
 func (c *Client) OnLocationEvent(fn func(LocationEvent)) {
 	c.mu.Lock()
 	c.onLocationEventFn = fn
+	c.mu.Unlock()
+}
+
+// OnPeerLocation registers a callback invoked when a bramble.onPeerLocation
+// notification arrives. The firmware sends this notification with no payload
+// whenever it receives and caches a peer location update. Call PeerLocations
+// to fetch the current peer location data.
+func (c *Client) OnPeerLocation(fn func(PeerLocationEvent)) {
+	c.mu.Lock()
+	c.onPeerLocationFn = fn
+	c.mu.Unlock()
+}
+
+// OnIdentityChange registers a callback invoked when a bramble.onIdentityChange
+// notification arrives. The firmware sends this after regenerating the node
+// identity due to an address collision, carrying the new address and reason.
+func (c *Client) OnIdentityChange(fn func(IdentityChangeEvent)) {
+	c.mu.Lock()
+	c.onIdentityChangeFn = fn
 	c.mu.Unlock()
 }
 

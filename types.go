@@ -414,6 +414,23 @@ type ProbeComplete struct {
 	Responders  []ProbeResponder `json:"responders,omitempty"`
 }
 
+// PeerLocationEvent is delivered via bramble.onPeerLocation notifications.
+// The firmware sends this with null params whenever a peer location update is
+// received and cached. Callers should call PeerLocations to fetch the updated
+// location data. The event itself carries no payload.
+type PeerLocationEvent struct{}
+
+// IdentityChangeEvent is delivered via bramble.onIdentityChange notifications.
+// The firmware sends this when an address collision is detected and a new
+// identity (address) has been generated. Callers should update any cached
+// local address after receiving this event.
+type IdentityChangeEvent struct {
+	// NewAddress is the node's newly assigned address as a hex string (e.g. "1A2B3C4D").
+	NewAddress string `json:"new_address"`
+	// Reason describes why the identity changed (e.g. "address_collision").
+	Reason string `json:"reason"`
+}
+
 // LocationUpdate is delivered via location.update notifications.
 type LocationUpdate struct {
 	Addr          string    `json:"addr"`
