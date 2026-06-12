@@ -33,7 +33,7 @@ func TestClient_Connect(t *testing.T) {
 	if err := c.Connect(ctx); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 }
 
 func TestClient_Connect_Incompatible(t *testing.T) {
@@ -49,7 +49,7 @@ func TestClient_Connect_Incompatible(t *testing.T) {
 
 func TestClient_Status(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"address":"1191C6E0","firmware_version":"0.2.0-dev","protocol_version":"0.2.0","hardware":"heltec_v3","radio_ok":true,"peers":2,"beacon_tx":10,"beacon_rx":20,"packets_tx":10,"packets_rx":20,"uptime_s":3600}}`)
 
@@ -73,7 +73,7 @@ func TestClient_Status(t *testing.T) {
 
 func TestClient_GetWifiStatus(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"mode":"station","ssid":"meshnet","ip":"192.0.2.0","rssi":-57,"mac":"AA:BB:CC:DD:EE:FF","clients":0}}`)
 
@@ -114,7 +114,7 @@ func TestClient_GetWifiStatus(t *testing.T) {
 
 func TestClient_GetDiagnostics(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"uptime_s":1234,"free_heap":45678,"heap":{"internal_free":1000,"internal_min_ever_free":900,"internal_largest_free_block":700,"dma_free":600,"dma_largest_free_block":500,"psram_free":400,"psram_min_ever_free":300},"task_stack_hwm":[{"task":"main","hwm_words":128,"hwm_bytes":512}]}}`)
 
@@ -149,7 +149,7 @@ func TestClient_GetDiagnostics(t *testing.T) {
 
 func TestClient_GetDiagnostics_DefaultParamsEmptyObject(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"uptime_s":1,"free_heap":2,"heap":{"internal_free":3,"internal_min_ever_free":4,"internal_largest_free_block":5,"dma_free":6,"dma_largest_free_block":7,"psram_free":8,"psram_min_ever_free":9},"task_stack_hwm":[]}}`)
 
@@ -172,7 +172,7 @@ func TestClient_GetDiagnostics_DefaultParamsEmptyObject(t *testing.T) {
 
 func TestClient_Neighbors(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"neighbors":[{"address":"12345678","rssi":-75,"snr":8.5,"last_seen_ms":1000},{"address":"DEADBEEF","rssi":-90,"snr":4.2,"last_seen_ms":2000}]}}`)
 
@@ -196,7 +196,7 @@ func TestClient_Neighbors(t *testing.T) {
 
 func TestClient_Ping(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"pong":true,"address":"4A555354","protocol_version":"0.2.0"}}`)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -207,7 +207,7 @@ func TestClient_Ping(t *testing.T) {
 
 func TestClient_Send(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"message_id":"TODO","status":"sent"}}`)
 
@@ -225,7 +225,7 @@ func TestClient_Send(t *testing.T) {
 
 func TestClient_Broadcast(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"message_id":"TODO","status":"sent"}}`)
 
@@ -243,7 +243,7 @@ func TestClient_Broadcast(t *testing.T) {
 
 func TestClient_BroadcastOnChannel(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"packet_id":"A1B2C3D4","status":"sent"}}`)
 
@@ -272,7 +272,7 @@ func TestClient_BroadcastOnChannel(t *testing.T) {
 
 func TestClient_SendCritical(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"packet_id":"A1B2C3D4","status":"sent"}}`)
 
@@ -295,7 +295,7 @@ func TestClient_SendCritical(t *testing.T) {
 
 func TestClient_SendBroadcastCritical(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"broadcast_id":"A1B2C3D4","status":"sent"}}`)
 
@@ -318,7 +318,7 @@ func TestClient_SendBroadcastCritical(t *testing.T) {
 
 func TestClient_OnMessage(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	received := make(chan Message, 1)
 	c.OnMessage(func(m Message) { received <- m })
@@ -340,7 +340,7 @@ func TestClient_OnMessage(t *testing.T) {
 
 func TestClient_OnAck(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	received := make(chan Ack, 1)
 	c.OnAck(func(a Ack) { received <- a })
@@ -362,7 +362,7 @@ func TestClient_OnAck(t *testing.T) {
 
 func TestClient_OnNeighborChange(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	fired := make(chan struct{}, 1)
 	c.OnNeighborChange(func() { fired <- struct{}{} })
@@ -381,7 +381,7 @@ func TestClient_OnNeighborChange(t *testing.T) {
 
 func TestClient_OnWifiEvent(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	received := make(chan WifiEvent, 1)
 	c.OnWifiEvent(func(e WifiEvent) { received <- e })
@@ -399,7 +399,7 @@ func TestClient_OnWifiEvent(t *testing.T) {
 
 func TestClient_OnGpsEvent(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	received := make(chan GpsEvent, 1)
 	c.OnGpsEvent(func(e GpsEvent) { received <- e })
@@ -417,7 +417,7 @@ func TestClient_OnGpsEvent(t *testing.T) {
 
 func TestClient_OnLocationEvent(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	received := make(chan LocationEvent, 1)
 	c.OnLocationEvent(func(e LocationEvent) { received <- e })
@@ -439,7 +439,7 @@ func TestClient_OnLocationEvent(t *testing.T) {
 
 func TestClient_Config(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"node_name":"mynode","address":"1191C6E0","radio":{"frequency_mhz":915,"sf":9,"bw_hz":125000,"tx_power_dbm":17,"profile":"long_range"},"channels":[{"id":0,"name":"public","has_psk":false,"epoch":0,"is_default":true},{"id":1,"name":"team","has_psk":true,"epoch":7,"is_default":false}],"location":{"enabled":true,"default_tier":"coarse","interval_s":300,"source":"gps","contact_rules":[{"address":"AABBCCDD","enabled":true,"tier":"full","interval_s":60}],"channel_targets":[{"channel":0,"enabled":true,"tier":"coarse","interval_s":120}]}}}`)
 
@@ -475,7 +475,7 @@ func TestClient_Config(t *testing.T) {
 
 func TestClient_SetRadio(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"ok":true}}`)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -487,7 +487,7 @@ func TestClient_SetRadio(t *testing.T) {
 
 func TestClient_OTAUpdate(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"ok":true,"note":"ota accepted","partition":"app0"}}`)
 
@@ -522,7 +522,7 @@ func TestClient_OTAUpdate(t *testing.T) {
 
 func TestClient_PeerLocations_CanonicalOnly(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"peerLocations":[{"addr":"AABBCCDD","name":"peer1","tier":"coarse","position":null,"online":true,"last_updated_ms":1234}],"peers":[{"addr":"DEADBEEF","name":"legacy","tier":"coarse","position":null,"online":false,"last_updated_ms":5678}]}}`)
 
@@ -540,7 +540,7 @@ func TestClient_PeerLocations_CanonicalOnly(t *testing.T) {
 
 func TestClient_SetLocationConfig_UsesCanonicalDefaultTierField(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"ok":true}}`)
 
 	enabled := true
@@ -568,7 +568,7 @@ func TestClient_SetLocationConfig_UsesCanonicalDefaultTierField(t *testing.T) {
 
 func TestClient_RPCError(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"method not found"}}`)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -579,7 +579,7 @@ func TestClient_RPCError(t *testing.T) {
 
 func TestClient_GetAuthToken(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -604,7 +604,7 @@ func TestClient_GetAuthToken(t *testing.T) {
 
 func TestClient_OnDecodeError_MalformedNotification(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	type decodeErr struct {
 		method  string
@@ -656,7 +656,7 @@ func TestClient_OnDecodeError_MalformedNotification(t *testing.T) {
 
 func TestClient_OnDecodeError_PayloadTruncated(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	errCh := make(chan []byte, 1)
 	c.OnDecodeError(func(_ string, _ error, payload []byte) {

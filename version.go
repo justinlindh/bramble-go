@@ -13,8 +13,9 @@ const (
 	// MaxProtocolVersion is the maximum protocol version this SDK can speak.
 	MaxProtocolVersion = "0.5.0"
 
-	// SDKVersion is the version of this SDK itself.
-	SDKVersion = "0.5.0"
+	// SDKVersion is the version of this SDK itself. Releases are tagged by
+	// semantic-release; bump this alongside the release tag when it moves.
+	SDKVersion = "0.9.0"
 )
 
 // IsCompatible reports whether the given firmware protocol version string

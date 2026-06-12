@@ -115,7 +115,7 @@ func (b *BLE) connect(ctx context.Context) error {
 				}
 			} else {
 				hasNUS := false
-				for _, uuid := range result.AdvertisementPayload.ServiceUUIDs() {
+				for _, uuid := range result.ServiceUUIDs() {
 					if uuid == nusServiceUUID {
 						hasNUS = true
 						break
@@ -171,10 +171,10 @@ func (b *BLE) connect(ctx context.Context) error {
 
 	var tx bluetooth.DeviceCharacteristic
 	for _, c := range chars {
-		uuid := c.UUID()
-		if uuid == nusTXUUID {
+		switch c.UUID() {
+		case nusTXUUID:
 			tx = c
-		} else if uuid == nusRXUUID {
+		case nusRXUUID:
 			if err := c.EnableNotifications(b.onNotification); err != nil {
 				_ = device.Disconnect()
 				return fmt.Errorf("bramble/transport/ble: enable RX notifications: %w", err)

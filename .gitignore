@@ -25,3 +25,6 @@ vendor/
 .DS_Store
 Thumbs.db
 *.log
+
+# Stray local build of the CLI (never committed)
+/bramble

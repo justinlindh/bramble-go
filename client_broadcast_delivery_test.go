@@ -9,7 +9,7 @@ import (
 
 func TestClient_SendBroadcast_ReturnsBroadcastID(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"broadcast_id":"BCAST-001","status":"queued"}}`)
 
@@ -27,7 +27,7 @@ func TestClient_SendBroadcast_ReturnsBroadcastID(t *testing.T) {
 
 func TestClient_OnBroadcastDelivery_TypedPayload(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	received := make(chan BroadcastDelivery, 1)
 	c.OnBroadcastDelivery(func(evt BroadcastDelivery) { received <- evt })
@@ -55,7 +55,7 @@ func TestClient_OnBroadcastDelivery_TypedPayload(t *testing.T) {
 
 func TestClient_OnBroadcastDelivery_UnknownFieldTolerance(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	received := make(chan BroadcastDelivery, 1)
 	c.OnBroadcastDelivery(func(evt BroadcastDelivery) { received <- evt })
@@ -80,7 +80,7 @@ func TestClient_OnBroadcastDelivery_UnknownFieldTolerance(t *testing.T) {
 
 func TestClient_BroadcastOnChannelCritical(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"packet_id":"CAFEBABE","status":"sent"}}`)
 

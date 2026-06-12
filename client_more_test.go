@@ -9,7 +9,7 @@ import (
 
 func TestClient_QueryMethodsCoverage(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -46,7 +46,7 @@ func TestClient_QueryMethodsCoverage(t *testing.T) {
 
 func TestClient_DeliveryEvents_WithAndWithoutLimit(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -78,7 +78,7 @@ func TestClient_DeliveryEvents_WithAndWithoutLimit(t *testing.T) {
 
 func TestClient_ActionAndConfigMethodsCoverage(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -161,7 +161,7 @@ func TestClient_ActionAndConfigMethodsCoverage(t *testing.T) {
 
 func TestClient_MissingRPCWrappersCoverage(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -283,7 +283,7 @@ func TestClient_Close_CallsTransportClose(t *testing.T) {
 
 func TestClient_TrafficDebugMethodsAndCallbacks(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
@@ -346,7 +346,7 @@ func TestClient_TrafficDebugMethodsAndCallbacks(t *testing.T) {
 
 func TestClient_CheckOKFalsePath(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
