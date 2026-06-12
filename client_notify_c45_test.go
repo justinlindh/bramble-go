@@ -10,7 +10,7 @@ import (
 
 func TestClient_OnPeerLocation(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	fired := make(chan PeerLocationEvent, 1)
 	c.OnPeerLocation(func(e PeerLocationEvent) { fired <- e })
@@ -28,7 +28,7 @@ func TestClient_OnPeerLocation(t *testing.T) {
 func TestClient_OnPeerLocation_NilCallback(t *testing.T) {
 	// Verify no panic when no callback is registered.
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onPeerLocation","params":null}`)
 	time.Sleep(100 * time.Millisecond) // give notifyLoop time to process
@@ -37,7 +37,7 @@ func TestClient_OnPeerLocation_NilCallback(t *testing.T) {
 
 func TestClient_OnIdentityChange(t *testing.T) {
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	received := make(chan IdentityChangeEvent, 1)
 	c.OnIdentityChange(func(e IdentityChangeEvent) { received <- e })
@@ -59,7 +59,7 @@ func TestClient_OnIdentityChange(t *testing.T) {
 func TestClient_OnIdentityChange_NilCallback(t *testing.T) {
 	// Verify no panic when no callback is registered.
 	c, mock := setupRawClient(t)
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onIdentityChange","params":{"new_address":"CAFEBABE","reason":"address_collision"}}`)
 	time.Sleep(100 * time.Millisecond)
@@ -78,7 +78,7 @@ func TestClient_WithOnPeerLocation_Option(t *testing.T) {
 	c.proto = NewProtocol(mock)
 	c.proto.Start()
 	go c.notifyLoop()
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onPeerLocation","params":null}`)
 
@@ -102,7 +102,7 @@ func TestClient_WithOnIdentityChange_Option(t *testing.T) {
 	c.proto = NewProtocol(mock)
 	c.proto.Start()
 	go c.notifyLoop()
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onIdentityChange","params":{"new_address":"12345678","reason":"address_collision"}}`)
 

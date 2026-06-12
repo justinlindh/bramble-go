@@ -396,12 +396,12 @@ type ProbeResult struct {
 
 // ProbeResponder is a single responder entry in a ProbeComplete notification.
 type ProbeResponder struct {
-	Address   string  `json:"address"`
-	Hops      int     `json:"hops"`
-	RSSI      int     `json:"rssi"`
-	SNR       float64 `json:"snr"`
-	LatencyMs int64   `json:"latency_ms"`
-	SeenRounds int    `json:"seen_rounds"`
+	Address    string  `json:"address"`
+	Hops       int     `json:"hops"`
+	RSSI       int     `json:"rssi"`
+	SNR        float64 `json:"snr"`
+	LatencyMs  int64   `json:"latency_ms"`
+	SeenRounds int     `json:"seen_rounds"`
 }
 
 // ProbeComplete is delivered when a probe window closes.

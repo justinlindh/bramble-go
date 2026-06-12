@@ -29,7 +29,7 @@ func TestWebSocketReconnectBackoffAndCallbacks(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer c.Close(websocket.StatusNormalClosure, "ok")
+		defer func() { _ = c.Close(websocket.StatusNormalClosure, "ok") }()
 		<-r.Context().Done()
 	}))
 	defer srv.Close()
@@ -54,7 +54,7 @@ func TestWebSocketReconnectBackoffAndCallbacks(t *testing.T) {
 	if err := w.reconnect(); err != nil {
 		t.Fatalf("reconnect failed: %v", err)
 	}
-	defer w.Close()
+	defer func() { _ = w.Close() }()
 
 	if calls != 3 {
 		t.Fatalf("expected 3 dial attempts, got %d", calls)
@@ -128,7 +128,7 @@ func TestWebSocketConnectInitialDialSuccess(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer c.Close(websocket.StatusNormalClosure, "ok")
+		defer func() { _ = c.Close(websocket.StatusNormalClosure, "ok") }()
 		<-r.Context().Done()
 	}))
 	defer srv.Close()
@@ -137,7 +137,7 @@ func TestWebSocketConnectInitialDialSuccess(t *testing.T) {
 	if err := w.Connect(context.Background()); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
-	defer w.Close()
+	defer func() { _ = w.Close() }()
 }
 
 func TestWebSocketTransport_SetAuthToken(t *testing.T) {
@@ -176,7 +176,7 @@ func TestWebSocketReconnect_UsesAuthTokenAfterSet(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer c.Close(websocket.StatusNormalClosure, "ok")
+		defer func() { _ = c.Close(websocket.StatusNormalClosure, "ok") }()
 		<-r.Context().Done()
 	}))
 	defer srv.Close()
@@ -196,7 +196,7 @@ func TestWebSocketReconnect_UsesAuthTokenAfterSet(t *testing.T) {
 	if err := w.reconnect(); err != nil {
 		t.Fatalf("reconnect failed: %v", err)
 	}
-	defer w.Close()
+	defer func() { _ = w.Close() }()
 
 	if gotAuth != "Bearer reconnect-token" {
 		t.Fatalf("expected reconnect auth header, got %q", gotAuth)
@@ -269,7 +269,7 @@ func TestWebSocketSendAndReceiveSuccess(t *testing.T) {
 		if err != nil {
 			return
 		}
-		defer c.Close(websocket.StatusNormalClosure, "ok")
+		defer func() { _ = c.Close(websocket.StatusNormalClosure, "ok") }()
 		for {
 			_, data, err := c.Read(r.Context())
 			if err != nil {
@@ -286,7 +286,7 @@ func TestWebSocketSendAndReceiveSuccess(t *testing.T) {
 	if err := w.Connect(context.Background()); err != nil {
 		t.Fatalf("Connect: %v", err)
 	}
-	defer w.Close()
+	defer func() { _ = w.Close() }()
 
 	if err := w.Send(context.Background(), []byte(`{"hello":"world"}`)); err != nil {
 		t.Fatalf("Send: %v", err)

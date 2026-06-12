@@ -351,7 +351,7 @@ func TestSerialConnect_WithAuthAndReader(t *testing.T) {
 	if err := s.Connect(context.Background()); err != nil {
 		t.Fatalf("Connect error: %v", err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 
 	received, err := s.Receive(context.Background())
 	if err != nil {

@@ -22,7 +22,7 @@ func main() {
 	if err := client.Connect(ctx); err != nil {
 		log.Fatalf("connect: %v", err)
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	// Get node status.
 	status, err := client.Status(ctx)
