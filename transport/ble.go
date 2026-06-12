@@ -29,18 +29,13 @@ var (
 	})
 )
 
-// BLEConfig holds configuration for a BLE transport connection.
-type BLEConfig struct {
-	AuthConfig
-	// DeviceName to scan for (e.g. "Bramble"). Empty = connect to first NUS device.
-	DeviceName string
-	// ScanTimeout is how long to scan before giving up. Default: 10s.
-	ScanTimeout time.Duration
-}
-
 // BLE implements Transport over BLE using the Nordic UART Service.
 type BLE struct {
-	cfg          BLEConfig
+	// deviceName to scan for (e.g. "Bramble"). Empty = connect to first NUS device.
+	deviceName string
+	// scanTimeout is how long to scan before giving up. Default: 10s.
+	scanTimeout  time.Duration
+	authToken    string
 	adapter      *bluetooth.Adapter
 	device       bluetooth.Device
 	txChar       bluetooth.DeviceCharacteristic
@@ -65,13 +60,11 @@ type BLE struct {
 // Use functional options (e.g. WithAuthToken) to configure the transport.
 func NewBLE(deviceName string, opts ...Option) *BLE {
 	b := &BLE{
-		cfg: BLEConfig{
-			DeviceName:  deviceName,
-			ScanTimeout: 10 * time.Second,
-		},
-		adapter: bluetooth.DefaultAdapter,
-		recvCh:  make(chan []byte, 32),
-		closeCh: make(chan struct{}),
+		deviceName:  deviceName,
+		scanTimeout: 10 * time.Second,
+		adapter:     bluetooth.DefaultAdapter,
+		recvCh:      make(chan []byte, 32),
+		closeCh:     make(chan struct{}),
 	}
 	for _, o := range opts {
 		o.applyBLE(b)
@@ -102,15 +95,15 @@ func (b *BLE) connect(ctx context.Context) error {
 	var foundName string
 	scanDone := make(chan struct{})
 
-	scanCtx, scanCancel := context.WithTimeout(ctx, b.cfg.ScanTimeout)
+	scanCtx, scanCancel := context.WithTimeout(ctx, b.scanTimeout)
 	defer scanCancel()
 
 	go func() {
 		_ = b.adapter.Scan(func(adapter *bluetooth.Adapter, result bluetooth.ScanResult) {
 			name := result.LocalName()
 
-			if b.cfg.DeviceName != "" {
-				if !strings.Contains(strings.ToLower(name), strings.ToLower(b.cfg.DeviceName)) {
+			if b.deviceName != "" {
+				if !strings.Contains(strings.ToLower(name), strings.ToLower(b.deviceName)) {
 					return
 				}
 			} else {
@@ -141,7 +134,7 @@ func (b *BLE) connect(ctx context.Context) error {
 	case <-scanDone:
 	case <-scanCtx.Done():
 		_ = b.adapter.StopScan()
-		return fmt.Errorf("bramble/transport/ble: scan timeout (no device found in %v)", b.cfg.ScanTimeout)
+		return fmt.Errorf("bramble/transport/ble: scan timeout (no device found in %v)", b.scanTimeout)
 	}
 
 	device, err := b.adapter.Connect(foundAddr, bluetooth.ConnectionParams{})
@@ -200,13 +193,17 @@ func (b *BLE) connect(ctx context.Context) error {
 	return nil
 }
 
-// authenticate performs an auth handshake when AuthToken is configured.
+// authenticate performs an auth handshake when an auth token is configured.
 func (b *BLE) authenticate(ctx context.Context) error {
-	if b.cfg.AuthToken == "" {
+	if b.authToken == "" {
 		return nil
 	}
 
-	if err := b.Send(ctx, buildAuthRequest(b.cfg.AuthToken)); err != nil {
+	req, err := buildAuthRequest(b.authToken)
+	if err != nil {
+		return fmt.Errorf("bramble/transport/ble: %w", err)
+	}
+	if err := b.Send(ctx, req); err != nil {
 		return fmt.Errorf("bramble/transport/ble: auth write: %w", err)
 	}
 
@@ -388,21 +385,20 @@ func (b *BLE) Close() error {
 }
 
 // SetAuthToken sets the authentication token for the BLE transport.
-// The token is stored in the nested BLEConfig.AuthConfig.
 func (b *BLE) SetAuthToken(token string) {
-	b.cfg.AuthToken = token
+	b.authToken = token
 }
 
-// GetAuthToken returns the currently configured BLE authentication token.
+// AuthToken returns the currently configured BLE authentication token.
 // BLE uses the same auth JSON-RPC negotiation as Serial, over the NUS transport.
-func (b *BLE) GetAuthToken() string {
-	return b.cfg.AuthToken
+func (b *BLE) AuthToken() string {
+	return b.authToken
 }
 
 // Info returns a description of the BLE transport.
 func (b *BLE) Info() string {
-	if b.cfg.DeviceName != "" {
-		return fmt.Sprintf("ble:%s", b.cfg.DeviceName)
+	if b.deviceName != "" {
+		return fmt.Sprintf("ble:%s", b.deviceName)
 	}
 	return "ble:auto-scan"
 }

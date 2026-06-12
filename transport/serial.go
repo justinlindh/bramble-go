@@ -104,9 +104,11 @@ func (s *Serial) authenticate() error {
 }
 
 func (s *Serial) sendAuth() error {
-	msg := append(buildAuthRequest(s.authToken), '\n')
-	_, err := s.conn.Write(msg)
+	req, err := buildAuthRequest(s.authToken)
 	if err != nil {
+		return fmt.Errorf("bramble/transport/serial: %w", err)
+	}
+	if _, err := s.conn.Write(append(req, '\n')); err != nil {
 		return fmt.Errorf("bramble/transport/serial: auth write: %w", err)
 	}
 	return nil
@@ -325,8 +327,8 @@ func (s *Serial) SetAuthToken(token string) {
 	s.authToken = token
 }
 
-// GetAuthToken returns the current authentication token for the serial transport.
-func (s *Serial) GetAuthToken() string {
+// AuthToken returns the current authentication token for the serial transport.
+func (s *Serial) AuthToken() string {
 	return s.authToken
 }
 

@@ -246,7 +246,11 @@ func TestSerialReader_ReconnectFailurePropagatesError(t *testing.T) {
 }
 
 func TestBuildAuthRequest(t *testing.T) {
-	got := string(buildAuthRequest("abc123"))
+	req, err := buildAuthRequest("abc123")
+	if err != nil {
+		t.Fatalf("buildAuthRequest: %v", err)
+	}
+	got := string(req)
 	want := `{"jsonrpc":"2.0","method":"bramble.auth","params":{"token":"abc123"},"id":0}`
 	if got != want {
 		t.Fatalf("unexpected auth request.\nwant: %s\n got: %s", want, got)

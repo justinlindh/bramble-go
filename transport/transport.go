@@ -1,5 +1,5 @@
 // Package transport provides Transport implementations for connecting to Bramble mesh nodes.
-// Supported transports: Serial (UART), WebSocket, and BLE (stub).
+// Supported transports: Serial (UART), WebSocket, and BLE (Nordic UART Service).
 package transport
 
 import (
@@ -30,14 +30,8 @@ type Transport interface {
 	// Must be called before Connect.
 	SetAuthToken(token string)
 
-	// GetAuthToken returns the currently configured authentication token.
-	GetAuthToken() string
-}
-
-// AuthConfig contains optional authentication settings shared by transports.
-type AuthConfig struct {
-	// AuthToken is used to authenticate with firmware that requires auth.
-	AuthToken string
+	// AuthToken returns the currently configured authentication token.
+	AuthToken() string
 }
 
 // ErrNotConnected is returned when an operation is attempted on an unconnected transport.
