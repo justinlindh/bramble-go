@@ -42,7 +42,7 @@ func TestBLESendNotConnected(t *testing.T) {
 func TestBLESendReconnecting(t *testing.T) {
 	b := NewBLE("")
 	b.reconnecting = true
-	if err := b.Send([]byte("{}")); !errors.Is(err, ErrReconnecting) {
+	if err := b.Send(context.Background(), []byte("{}")); !errors.Is(err, ErrReconnecting) {
 		t.Fatalf("expected ErrReconnecting, got %v", err)
 	}
 }
