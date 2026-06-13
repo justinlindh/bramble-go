@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/justinlindh/bramble-go/transport"
+	"github.com/justinlindh/bramble-go/transport/transporttest"
 )
 
 func TestClient_OnPeerLocation(t *testing.T) {
@@ -67,7 +67,7 @@ func TestClient_OnIdentityChange_NilCallback(t *testing.T) {
 }
 
 func TestClient_WithOnPeerLocation_Option(t *testing.T) {
-	mock := transport.NewMock()
+	mock := transporttest.NewMock()
 	ctx := context.Background()
 	if err := mock.Connect(ctx); err != nil {
 		t.Fatalf("mock.Connect: %v", err)
@@ -91,7 +91,7 @@ func TestClient_WithOnPeerLocation_Option(t *testing.T) {
 }
 
 func TestClient_WithOnIdentityChange_Option(t *testing.T) {
-	mock := transport.NewMock()
+	mock := transporttest.NewMock()
 	ctx := context.Background()
 	if err := mock.Connect(ctx); err != nil {
 		t.Fatalf("mock.Connect: %v", err)

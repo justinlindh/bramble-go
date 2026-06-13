@@ -115,11 +115,11 @@ func TestSerialInfo(t *testing.T) {
 
 func TestNewBLEConfig(t *testing.T) {
 	b := NewBLE("Bramble", WithBLEScanTimeout(5e9))
-	if b.cfg.DeviceName != "Bramble" {
-		t.Fatalf("unexpected device name: %s", b.cfg.DeviceName)
+	if b.deviceName != "Bramble" {
+		t.Fatalf("unexpected device name: %s", b.deviceName)
 	}
-	if b.cfg.ScanTimeout != 5e9 {
-		t.Fatalf("unexpected scan timeout: %v", b.cfg.ScanTimeout)
+	if b.scanTimeout != 5e9 {
+		t.Fatalf("unexpected scan timeout: %v", b.scanTimeout)
 	}
 	if b.recvCh == nil || b.closeCh == nil {
 		t.Fatal("channels should be initialized")
@@ -128,8 +128,8 @@ func TestNewBLEConfig(t *testing.T) {
 
 func TestNewBLEDefaultScanTimeout(t *testing.T) {
 	b := NewBLE("")
-	if b.cfg.ScanTimeout != 10e9 {
-		t.Fatalf("expected 10s default, got %v", b.cfg.ScanTimeout)
+	if b.scanTimeout != 10e9 {
+		t.Fatalf("expected 10s default, got %v", b.scanTimeout)
 	}
 }
 

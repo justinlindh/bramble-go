@@ -32,16 +32,16 @@ func TestMessageMarshalOmitsEmptyOptionalFields(t *testing.T) {
 func TestRadioConfigMarshalPointers(t *testing.T) {
 	sf := 9
 	freq := 915.5
-	r := RadioConfig{SF: &sf, FreqMhz: &freq}
+	r := RadioConfig{SF: &sf, FrequencyMhz: &freq}
 	out, err := json.Marshal(r)
 	if err != nil {
 		t.Fatalf("marshal failed: %v", err)
 	}
 	got := string(out)
-	if !contains(got, `"sf":9`) || !contains(got, `"freq_mhz":915.5`) {
+	if !contains(got, `"sf":9`) || !contains(got, `"frequency_mhz":915.5`) {
 		t.Fatalf("missing set fields: %s", got)
 	}
-	if contains(got, "tx_power_dbm") || contains(got, "bw_khz") || contains(got, "cr") {
+	if contains(got, "tx_power_dbm") || contains(got, "bw_hz") || contains(got, "cr") {
 		t.Fatalf("nil pointer fields should be omitted: %s", got)
 	}
 }

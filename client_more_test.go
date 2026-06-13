@@ -166,21 +166,21 @@ func TestClient_MissingRPCWrappersCoverage(t *testing.T) {
 	defer cancel()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"voltage_mv":4021,"percentage":83}}`)
-	battery, err := c.GetBattery(ctx)
+	battery, err := c.Battery(ctx)
 	if err != nil || battery.VoltageMV != 4021 || battery.Percentage != 83 {
-		t.Fatalf("GetBattery failed: resp=%+v err=%v", battery, err)
+		t.Fatalf("Battery failed: resp=%+v err=%v", battery, err)
 	}
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":2,"result":{"lat":37.1,"lon":-122.2,"alt":15,"speed_kmh":1.2,"heading_deg":270,"accuracy_m":6.5,"timestamp":1730000000,"valid":true}}`)
-	gps, err := c.GetGpsPosition(ctx)
+	gps, err := c.GPSPosition(ctx)
 	if err != nil || !gps.Valid || gps.Lat != 37.1 || gps.AccuracyM != 6.5 {
-		t.Fatalf("GetGpsPosition failed: resp=%+v err=%v", gps, err)
+		t.Fatalf("GPSPosition failed: resp=%+v err=%v", gps, err)
 	}
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":3,"result":{"config":{"enabled":true,"mode":"adaptive","baseIntervalMs":10000,"minIntervalMs":3000,"maxIntervalMs":30000,"denseThreshold":8,"churnThreshold":3,"churnWindowMs":60000},"status":{"activeMode":"adaptive","currentIntervalMs":12000,"neighborCount":4,"churnEvents":1,"lastTransitionMs":1730000100,"inBackoff":false}}}`)
-	policy, err := c.GetBeaconPolicy(ctx)
+	policy, err := c.BeaconPolicy(ctx)
 	if err != nil || policy.Config.Mode != "adaptive" || policy.Status.CurrentIntervalMs != 12000 {
-		t.Fatalf("GetBeaconPolicy failed: resp=%+v err=%v", policy, err)
+		t.Fatalf("BeaconPolicy failed: resp=%+v err=%v", policy, err)
 	}
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":4,"result":{"ok":true}}`)
@@ -216,15 +216,15 @@ func TestClient_MissingRPCWrappersCoverage(t *testing.T) {
 	}
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":10,"result":{"available":true,"volume":75,"muted":true,"playing":false}}`)
-	audio, err := c.GetAudioStatus(ctx)
+	audio, err := c.AudioStatus(ctx)
 	if err != nil || !audio.Available || audio.Volume != 75 || !audio.Muted {
-		t.Fatalf("GetAudioStatus failed: resp=%+v err=%v", audio, err)
+		t.Fatalf("AudioStatus failed: resp=%+v err=%v", audio, err)
 	}
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":11,"result":{"sd_present":true,"mount_point":"/sdcard"}}`)
-	storage, err := c.GetStorageInfo(ctx)
+	storage, err := c.StorageInfo(ctx)
 	if err != nil || !storage.SDPresent || storage.MountPoint != "/sdcard" {
-		t.Fatalf("GetStorageInfo failed: resp=%+v err=%v", storage, err)
+		t.Fatalf("StorageInfo failed: resp=%+v err=%v", storage, err)
 	}
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":12,"result":{"ok":true,"broadcast_telemetry_mode":"path_sampled"}}`)
@@ -296,15 +296,15 @@ func TestClient_TrafficDebugMethodsAndCallbacks(t *testing.T) {
 	}
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":2,"result":{"enabled":true,"include_tx":true,"include_rx":false,"sample_rate":50,"buffer_capacity":256,"buffer_count":10,"dropped_count":2}}`)
-	getResp, err := c.GetTrafficDebug(ctx)
+	getResp, err := c.TrafficDebug(ctx)
 	if err != nil || getResp.BufferCapacity != 256 || getResp.DroppedCount != 2 {
-		t.Fatalf("GetTrafficDebug failed: resp=%+v err=%v", getResp, err)
+		t.Fatalf("TrafficDebug failed: resp=%+v err=%v", getResp, err)
 	}
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":3,"result":{"events":[{"seq":1,"timestamp_ms":123,"pkt_type":1,"category":"chat","airtime_tier":"normal","packet_len":16,"rssi":-80,"is_tx":false}],"returned":1,"total_available":1}}`)
-	eventsResp, err := c.GetTrafficEvents(ctx, GetTrafficEventsParams{})
+	eventsResp, err := c.TrafficEvents(ctx, TrafficEventsParams{})
 	if err != nil || eventsResp.Returned != 1 || len(eventsResp.Events) != 1 {
-		t.Fatalf("GetTrafficEvents failed: resp=%+v err=%v", eventsResp, err)
+		t.Fatalf("TrafficEvents failed: resp=%+v err=%v", eventsResp, err)
 	}
 
 	probeCh := make(chan ProbeResult, 1)

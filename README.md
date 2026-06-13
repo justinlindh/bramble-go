@@ -81,7 +81,7 @@ See [`examples/`](examples/) for more.
 |-----------|--------|-------------|
 | Serial (UART) | Ready | `transport.NewSerial("/dev/ttyUSB0")` |
 | WebSocket | Ready | `transport.NewWebSocket("ws://192.168.4.1/ws")` |
-| BLE (NUS) | Ready | `transport.NewBLE(transport.BLEConfig{...})` |
+| BLE (NUS) | Ready | `transport.NewBLE("Bramble")` |
 
 ### WebSocket Auto-Reconnect
 
@@ -99,14 +99,13 @@ During reconnect, `Send()` returns `transport.ErrReconnecting`.
 
 BLE support uses Nordic UART Service with newline-delimited JSON-RPC payloads. Platform support and permissions depend on your host BLE stack.
 
-Use `DeviceName` to target a specific node or leave it empty to connect to the first matching Bramble NUS device:
+Pass a device name to target a specific node, or an empty string to connect to the first matching Bramble NUS device:
 
 ```go
-ble := transport.NewBLE(transport.BLEConfig{
-    DeviceName:  "Bramble",
-    ScanTimeout: 15 * time.Second,
-})
+ble := transport.NewBLE("Bramble", transport.WithBLEScanTimeout(15*time.Second))
 ```
+
+All three constructors share the same functional options: `WithAuthToken` (every transport), `WithBaudRate` (serial), and `WithBLEScanTimeout` (BLE).
 
 For additional BLE guidance and full transport notes, see [docs/API.md](docs/API.md#ble-transport-details).
 
@@ -118,6 +117,7 @@ All client methods accept `context.Context` for timeout and cancellation.
 - **Action methods**: Send messages, probe, modify configuration, run maintenance operations (`Send*`, channel/radio config, `Reboot`, `OTAUpdate`, etc.).
 - **Notification callbacks**: Subscribe to async events such as incoming messages, acks, probes, traffic events, Wi-Fi/GPS/location updates.
 - **Action message helpers**: `WrapAction`, `IsAction`, and `ActionText` support IRC-style `/me` messages.
+- **Test doubles**: the `transport/transporttest` package provides an in-memory `transport.Transport` (`transporttest.NewMock`) for consumer tests.
 
 See the full API reference in [docs/API.md](docs/API.md).
 

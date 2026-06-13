@@ -110,73 +110,73 @@ func TestBLEInfo(t *testing.T) {
 func TestBLETransport_SetAuthToken(t *testing.T) {
 	b := NewBLE("")
 
-	if b.cfg.AuthToken != "" {
-		t.Fatalf("expected empty token by default, got %q", b.cfg.AuthToken)
+	if b.authToken != "" {
+		t.Fatalf("expected empty token by default, got %q", b.authToken)
 	}
 
 	b.SetAuthToken("token-1")
-	if b.cfg.AuthToken != "token-1" {
-		t.Fatalf("expected token-1, got %q", b.cfg.AuthToken)
+	if b.authToken != "token-1" {
+		t.Fatalf("expected token-1, got %q", b.authToken)
 	}
 
 	b.SetAuthToken("token-2")
-	if b.cfg.AuthToken != "token-2" {
-		t.Fatalf("expected overwritten token-2, got %q", b.cfg.AuthToken)
+	if b.authToken != "token-2" {
+		t.Fatalf("expected overwritten token-2, got %q", b.authToken)
 	}
 
 	b.SetAuthToken("")
-	if b.cfg.AuthToken != "" {
-		t.Fatalf("expected empty token, got %q", b.cfg.AuthToken)
+	if b.authToken != "" {
+		t.Fatalf("expected empty token, got %q", b.authToken)
 	}
 }
 
-func TestBLETransport_GetAuthToken(t *testing.T) {
+func TestBLETransport_AuthToken(t *testing.T) {
 	b := NewBLE("")
 
-	if got := b.GetAuthToken(); got != "" {
+	if got := b.AuthToken(); got != "" {
 		t.Fatalf("expected empty token by default, got %q", got)
 	}
 
 	b.SetAuthToken("ble-token")
-	if got := b.GetAuthToken(); got != "ble-token" {
+	if got := b.AuthToken(); got != "ble-token" {
 		t.Fatalf("expected ble-token, got %q", got)
 	}
 }
 
 func TestBLENewBLE_WithAuthToken(t *testing.T) {
 	b := NewBLE("Bramble", WithAuthToken("secret"))
-	if b.cfg.AuthToken != "secret" {
-		t.Fatalf("expected auth token 'secret', got %q", b.cfg.AuthToken)
+	if b.authToken != "secret" {
+		t.Fatalf("expected auth token 'secret', got %q", b.authToken)
 	}
-	if b.cfg.DeviceName != "Bramble" {
-		t.Fatalf("expected device name 'Bramble', got %q", b.cfg.DeviceName)
+	if b.deviceName != "Bramble" {
+		t.Fatalf("expected device name 'Bramble', got %q", b.deviceName)
 	}
 }
 
 func TestBLENewBLE_WithScanTimeout(t *testing.T) {
 	b := NewBLE("", WithBLEScanTimeout(30*time.Second))
-	if b.cfg.ScanTimeout != 30*time.Second {
-		t.Fatalf("expected 30s scan timeout, got %v", b.cfg.ScanTimeout)
+	if b.scanTimeout != 30*time.Second {
+		t.Fatalf("expected 30s scan timeout, got %v", b.scanTimeout)
 	}
 }
 
 func TestBLENewBLE_DefaultScanTimeout(t *testing.T) {
 	b := NewBLE("")
-	if b.cfg.ScanTimeout != 10*time.Second {
-		t.Fatalf("expected default 10s scan timeout, got %v", b.cfg.ScanTimeout)
+	if b.scanTimeout != 10*time.Second {
+		t.Fatalf("expected default 10s scan timeout, got %v", b.scanTimeout)
 	}
 }
 
 func TestBLENewBLE_MultipleOptions(t *testing.T) {
 	b := NewBLE("MyDevice", WithAuthToken("tok"), WithBLEScanTimeout(5*time.Second))
-	if b.cfg.AuthToken != "tok" {
-		t.Fatalf("expected auth token 'tok', got %q", b.cfg.AuthToken)
+	if b.authToken != "tok" {
+		t.Fatalf("expected auth token 'tok', got %q", b.authToken)
 	}
-	if b.cfg.DeviceName != "MyDevice" {
-		t.Fatalf("expected device name 'MyDevice', got %q", b.cfg.DeviceName)
+	if b.deviceName != "MyDevice" {
+		t.Fatalf("expected device name 'MyDevice', got %q", b.deviceName)
 	}
-	if b.cfg.ScanTimeout != 5*time.Second {
-		t.Fatalf("expected 5s scan timeout, got %v", b.cfg.ScanTimeout)
+	if b.scanTimeout != 5*time.Second {
+		t.Fatalf("expected 5s scan timeout, got %v", b.scanTimeout)
 	}
 }
 

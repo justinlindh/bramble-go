@@ -43,11 +43,11 @@ func WithAuthToken(token string) Option {
 	return option{
 		serial:    func(s *Serial) { s.authToken = token },
 		websocket: func(w *WebSocket) { w.authToken = token },
-		ble:       func(b *BLE) { b.cfg.AuthToken = token },
+		ble:       func(b *BLE) { b.authToken = token },
 	}
 }
 
 // WithBLEScanTimeout sets the BLE scan timeout duration.
 func WithBLEScanTimeout(d time.Duration) Option {
-	return option{ble: func(b *BLE) { b.cfg.ScanTimeout = d }}
+	return option{ble: func(b *BLE) { b.scanTimeout = d }}
 }

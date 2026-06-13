@@ -52,8 +52,8 @@ type BatteryStatus struct {
 	Percentage int `json:"percentage"`
 }
 
-// GpsPosition is returned by bramble.getGpsPosition.
-type GpsPosition struct {
+// GPSPosition is returned by bramble.getGpsPosition.
+type GPSPosition struct {
 	Lat        float64 `json:"lat,omitempty"`
 	Lon        float64 `json:"lon,omitempty"`
 	Alt        float64 `json:"alt,omitempty"`
@@ -181,13 +181,13 @@ type VersionResponse struct {
 
 // DeliveryReplayEvent is returned by bramble.getDeliveryEvents.
 type DeliveryReplayEvent struct {
-	EventSeq    uint32                 `json:"event_seq"`
-	EventID     string                 `json:"event_id,omitempty"`
-	EventType   string                 `json:"event_type"`
-	PacketID    string                 `json:"packet_id,omitempty"`
-	BroadcastID string                 `json:"broadcast_id,omitempty"`
-	TimestampMs int64                  `json:"timestamp_ms"`
-	Payload     map[string]interface{} `json:"payload,omitempty"`
+	EventSeq    uint32         `json:"event_seq"`
+	EventID     string         `json:"event_id,omitempty"`
+	EventType   string         `json:"event_type"`
+	PacketID    string         `json:"packet_id,omitempty"`
+	BroadcastID string         `json:"broadcast_id,omitempty"`
+	TimestampMs int64          `json:"timestamp_ms"`
+	Payload     map[string]any `json:"payload,omitempty"`
 }
 
 // DeliveryReplayResponse is returned by bramble.getDeliveryEvents.
@@ -312,8 +312,8 @@ type WifiEvent struct {
 	RSSI      int    `json:"rssi,omitempty"`
 }
 
-// GpsEvent is delivered via bramble.onGpsEvent notifications.
-type GpsEvent struct {
+// GPSEvent is delivered via bramble.onGpsEvent notifications.
+type GPSEvent struct {
 	Event string  `json:"event"`
 	Valid bool    `json:"valid,omitempty"`
 	Lat   float64 `json:"lat,omitempty"`
@@ -516,22 +516,12 @@ type ConfigRadio struct {
 // Field names and units match the firmware wire format:
 //   - BwHz: bandwidth in Hz (e.g. 125000), matching ConfigRadio.BwHz
 //   - FrequencyMhz: frequency in MHz (e.g. 915.0), matching ConfigRadio.FrequencyMhz
-//
-// Deprecated aliases BwKhz and FreqMhz are retained for backward compatibility
-// but should not be used in new code.
 type RadioConfig struct {
 	TxPowerDbm   *int     `json:"tx_power_dbm,omitempty"`
 	SF           *int     `json:"sf,omitempty"`
 	BwHz         *int     `json:"bw_hz,omitempty"`
 	CR           *int     `json:"cr,omitempty"`
 	FrequencyMhz *float64 `json:"frequency_mhz,omitempty"`
-
-	// Deprecated: Use BwHz (Hz) instead. BwKhz is retained for backward
-	// compatibility; if both are set, BwHz takes precedence.
-	BwKhz *int `json:"bw_khz,omitempty"`
-	// Deprecated: Use FrequencyMhz instead. FreqMhz is retained for backward
-	// compatibility; if both are set, FrequencyMhz takes precedence.
-	FreqMhz *float64 `json:"freq_mhz,omitempty"`
 }
 
 // LocationContactRule is a per-peer location sharing policy rule.
@@ -579,8 +569,8 @@ type SetTrafficDebugResponse struct {
 	SampleRate int  `json:"sample_rate"`
 }
 
-// GetTrafficDebugResponse is returned by bramble.getTrafficDebug.
-type GetTrafficDebugResponse struct {
+// TrafficDebugResponse is returned by bramble.getTrafficDebug.
+type TrafficDebugResponse struct {
 	Enabled        bool `json:"enabled"`
 	IncludeTx      bool `json:"include_tx"`
 	IncludeRx      bool `json:"include_rx"`
@@ -590,14 +580,14 @@ type GetTrafficDebugResponse struct {
 	DroppedCount   int  `json:"dropped_count"`
 }
 
-// GetTrafficEventsParams contains parameters for bramble.getTrafficEvents.
-type GetTrafficEventsParams struct {
+// TrafficEventsParams contains parameters for bramble.getTrafficEvents.
+type TrafficEventsParams struct {
 	SinceSeq *uint32 `json:"since_seq,omitempty"`
 	Limit    *int    `json:"limit,omitempty"` // 1-512, default 100
 }
 
-// GetTrafficEventsResponse is returned by bramble.getTrafficEvents.
-type GetTrafficEventsResponse struct {
+// TrafficEventsResponse is returned by bramble.getTrafficEvents.
+type TrafficEventsResponse struct {
 	Events         []TrafficEvent `json:"events"`
 	Returned       int            `json:"returned"`
 	TotalAvailable int            `json:"total_available"`

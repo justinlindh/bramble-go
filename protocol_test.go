@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"github.com/justinlindh/bramble-go/transport"
+	"github.com/justinlindh/bramble-go/transport/transporttest"
 )
 
-func newConnectedProtocol(t *testing.T) (*Protocol, *transport.MockTransport) {
+func newConnectedProtocol(t *testing.T) (*Protocol, *transporttest.Mock) {
 	t.Helper()
-	mock := transport.NewMock()
+	mock := transporttest.NewMock()
 	ctx := context.Background()
 	if err := mock.Connect(ctx); err != nil {
 		t.Fatalf("mock connect: %v", err)
@@ -163,7 +164,7 @@ func (f *flakyReconnectTransport) Connect(context.Context) error { return nil }
 func (f *flakyReconnectTransport) Close() error                  { return nil }
 func (f *flakyReconnectTransport) Info() string                  { return "flaky" }
 func (f *flakyReconnectTransport) SetAuthToken(_ string)         {}
-func (f *flakyReconnectTransport) GetAuthToken() string          { return "" }
+func (f *flakyReconnectTransport) AuthToken() string             { return "" }
 
 func (f *flakyReconnectTransport) Send(_ context.Context, _ []byte) error {
 	f.mu.Lock()

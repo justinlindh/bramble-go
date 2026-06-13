@@ -1,10 +1,10 @@
 module github.com/justinlindh/bramble-go
 
-go 1.26.1
+go 1.25.0
 
 require (
+	github.com/coder/websocket v1.8.14
 	go.bug.st/serial v1.6.4
-	nhooyr.io/websocket v1.8.17
 	tinygo.org/x/bluetooth v0.14.0
 )
 
@@ -18,6 +18,6 @@ require (
 	github.com/soypat/seqs v0.0.0-20250124201400-0d65bc7c1710 // indirect
 	github.com/tinygo-org/cbgo v0.0.4 // indirect
 	github.com/tinygo-org/pio v0.2.0 // indirect
-	golang.org/x/exp v0.0.0-20241204233417-43b7b7cde48d // indirect
-	golang.org/x/sys v0.19.0 // indirect
+	golang.org/x/exp v0.0.0-20260611194520-c48552f49976 // indirect
+	golang.org/x/sys v0.46.0 // indirect
 )

@@ -1,13 +1,15 @@
-package transport
+package transporttest
 
 import (
 	"context"
 	"errors"
 	"testing"
 	"time"
+
+	"github.com/justinlindh/bramble-go/transport"
 )
 
-func TestMockTransportConnectAndClose(t *testing.T) {
+func TestMockConnectAndClose(t *testing.T) {
 	m := NewMock()
 	if m.IsConnected() {
 		t.Fatal("expected disconnected initially")
@@ -26,14 +28,14 @@ func TestMockTransportConnectAndClose(t *testing.T) {
 	}
 }
 
-func TestMockTransportSendWhenDisconnected(t *testing.T) {
+func TestMockSendWhenDisconnected(t *testing.T) {
 	m := NewMock()
-	if err := m.Send(context.Background(), []byte(`{"x":1}`)); !errors.Is(err, ErrNotConnected) {
+	if err := m.Send(context.Background(), []byte(`{"x":1}`)); !errors.Is(err, transport.ErrNotConnected) {
 		t.Fatalf("expected ErrNotConnected, got %v", err)
 	}
 }
 
-func TestMockTransportReceiveTimeout(t *testing.T) {
+func TestMockReceiveTimeout(t *testing.T) {
 	m := NewMock()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
@@ -43,7 +45,7 @@ func TestMockTransportReceiveTimeout(t *testing.T) {
 	}
 }
 
-func TestMockTransportQueueResponseOrderingAndSent(t *testing.T) {
+func TestMockQueueResponseOrderingAndSent(t *testing.T) {
 	m := NewMock()
 	_ = m.Connect(context.Background())
 
@@ -73,7 +75,7 @@ func TestMockTransportQueueResponseOrderingAndSent(t *testing.T) {
 	}
 }
 
-func TestMockTransportInjectAsync(t *testing.T) {
+func TestMockInjectAsync(t *testing.T) {
 	m := NewMock()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -88,7 +90,7 @@ func TestMockTransportInjectAsync(t *testing.T) {
 	}
 }
 
-func TestMockTransportInfoAndMockError(t *testing.T) {
+func TestMockInfoAndMockError(t *testing.T) {
 	m := NewMock()
 	if m.Info() != "mock" {
 		t.Fatalf("unexpected info: %q", m.Info())
@@ -102,7 +104,7 @@ func TestMockTransportInfoAndMockError(t *testing.T) {
 	}
 }
 
-func TestMockTransport_SetAuthToken(t *testing.T) {
+func TestMock_SetAuthToken(t *testing.T) {
 	m := NewMock()
 
 	if m.authToken != "" {

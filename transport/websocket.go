@@ -1,4 +1,3 @@
-//nolint:staticcheck // SA1019: nhooyr/websocket is currently required for transport compatibility; migration to coder/websocket tracked separately.
 package transport
 
 import (
@@ -11,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"nhooyr.io/websocket"
+	"github.com/coder/websocket"
 )
 
 var (
@@ -236,8 +235,8 @@ func (w *WebSocket) SetAuthToken(token string) {
 	w.authToken = token
 }
 
-// GetAuthToken returns the current authentication token for the WebSocket transport.
-func (w *WebSocket) GetAuthToken() string {
+// AuthToken returns the current authentication token for the WebSocket transport.
+func (w *WebSocket) AuthToken() string {
 	return w.authToken
 }
 

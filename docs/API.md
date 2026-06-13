@@ -23,8 +23,8 @@ All methods accept a `context.Context` for timeout/cancellation.
 | Method | Returns | Description |
 |--------|---------|-------------|
 | `Status(ctx)` | `*StatusResponse` | Address, firmware, peers, counters, uptime |
-| `GetWifiStatus(ctx)` | `*WifiStatus` | Wi-Fi mode/link/AP client status |
-| `GetDiagnostics(ctx, includeHeapDump)` | `*DiagnosticsResponse` | Runtime heap and task stack diagnostics |
+| `WifiStatus(ctx)` | `*WifiStatus` | Wi-Fi mode/link/AP client status |
+| `Diagnostics(ctx, includeHeapDump)` | `*DiagnosticsResponse` | Runtime heap and task stack diagnostics |
 | `Identity(ctx)` | `*IdentityResponse` | Address + public key hash |
 | `Version(ctx)` | `*VersionResponse` | Firmware/protocol version, hardware |
 | `DeliveryEvents(ctx, sinceEventSeq, limit)` | `*DeliveryReplayResponse` | Replay persisted delivery telemetry events |
@@ -35,43 +35,43 @@ All methods accept a `context.Context` for timeout/cancellation.
 | `Messages(ctx)` | `[]Message` | Stored message history |
 | `PeerLocations(ctx)` | `[]LocationPeer` | Peer location data |
 | `Config(ctx)` | `*ConfigResponse` | Full node config (name, address, radio, channels) |
-| `GetTrafficDebug(ctx)` | `*GetTrafficDebugResponse` | Current traffic debug config and ring-buffer state |
-| `GetTrafficEvents(ctx, params)` | `*GetTrafficEventsResponse` | Pull traffic debug events from ring buffer |
-| `GetBattery(ctx)` | `*BatteryStatus` | Battery voltage (mV) and charge percentage |
-| `GetGpsPosition(ctx)` | `*GpsPosition` | Current GPS fix (lat/lon/alt/speed/heading/accuracy) |
-| `GetBeaconPolicy(ctx)` | `*BeaconPolicyResponse` | Adaptive beacon policy config and runtime status |
-| `GetAudioStatus(ctx)` | `*AudioStatus` | Audio availability, volume, mute, and playback state |
-| `GetStorageInfo(ctx)` | `*StorageInfo` | Board storage status (SD card presence and mount point) |
-| `GetAuthToken(ctx)` | `(string, error)` | Retrieve the device's WebSocket auth token (typically over serial) |
+| `TrafficDebug(ctx)` | `*TrafficDebugResponse` | Current traffic debug config and ring-buffer state |
+| `TrafficEvents(ctx, params)` | `*TrafficEventsResponse` | Pull traffic debug events from ring buffer |
+| `Battery(ctx)` | `*BatteryStatus` | Battery voltage (mV) and charge percentage |
+| `GPSPosition(ctx)` | `*GPSPosition` | Current GPS fix (lat/lon/alt/speed/heading/accuracy) |
+| `BeaconPolicy(ctx)` | `*BeaconPolicyResponse` | Adaptive beacon policy config and runtime status |
+| `AudioStatus(ctx)` | `*AudioStatus` | Audio availability, volume, mute, and playback state |
+| `StorageInfo(ctx)` | `*StorageInfo` | Board storage status (SD card presence and mount point) |
+| `AuthToken(ctx)` | `(string, error)` | Retrieve the device's WebSocket auth token (typically over serial) |
 
 ### Query Usage Examples
 
 ```go
-wifi, _ := client.GetWifiStatus(ctx)
+wifi, _ := client.WifiStatus(ctx)
 fmt.Printf("wifi mode=%s ssid=%s ip=%s\n", wifi.Mode, wifi.SSID, wifi.IP)
 
 replay, _ := client.DeliveryEvents(ctx, 0, 100)
 fmt.Printf("delivery events replayed=%d\n", len(replay.Events))
 
-bat, _ := client.GetBattery(ctx)
+bat, _ := client.Battery(ctx)
 fmt.Printf("battery %dmV (%d%%)\n", bat.VoltageMV, bat.Percentage)
 
-pos, _ := client.GetGpsPosition(ctx)
+pos, _ := client.GPSPosition(ctx)
 if pos.Valid {
     fmt.Printf("GPS lat=%.6f lon=%.6f alt=%.1fm\n", pos.Lat, pos.Lon, pos.Alt)
 }
 
-beacon, _ := client.GetBeaconPolicy(ctx)
+beacon, _ := client.BeaconPolicy(ctx)
 fmt.Printf("beacon mode=%s interval=%dms\n", beacon.Status.ActiveMode, beacon.Status.CurrentIntervalMs)
 
-audio, _ := client.GetAudioStatus(ctx)
+audio, _ := client.AudioStatus(ctx)
 fmt.Printf("audio available=%v volume=%d muted=%v\n", audio.Available, audio.Volume, audio.Muted)
 
-storage, _ := client.GetStorageInfo(ctx)
+storage, _ := client.StorageInfo(ctx)
 fmt.Printf("SD present=%v mount=%s\n", storage.SDPresent, storage.MountPoint)
 
 // Retrieve auth token over serial before connecting via WebSocket
-token, _ := client.GetAuthToken(ctx)
+token, _ := client.AuthToken(ctx)
 fmt.Println("auth token:", token)
 ```
 
@@ -83,7 +83,6 @@ fmt.Println("auth token:", token)
 | `SendCritical(ctx, dest, text)` | `*SendResult` | Send critical-priority unicast message |
 | `SendBroadcast(ctx, text)` | `*SendResult` | Broadcast on the public channel |
 | `SendBroadcastCritical(ctx, text)` | `*SendResult` | Critical-priority broadcast on the public channel |
-| `Broadcast(ctx, text)` | `*SendResult` | Deprecated alias for `SendBroadcast` |
 | `BroadcastOnChannel(ctx, channel, text)` | `*SendResult` | Broadcast on a specific channel index |
 | `BroadcastOnChannelCritical(ctx, channel, text)` | `*SendResult` | Critical-priority broadcast on a specific channel |
 | `SendProbe(ctx)` | `*SendProbeResult` | Network reachability probe |
@@ -126,20 +125,20 @@ fmt.Println("ota scheduled:", ota.OK)
 enabled := true
 sample := 100
 _, _ = client.SetTrafficDebug(ctx, bramble.SetTrafficDebugParams{Enabled: &enabled, SampleRate: &sample})
-state, _ := client.GetTrafficDebug(ctx)
+state, _ := client.TrafficDebug(ctx)
 fmt.Println("traffic debug enabled:", state.Enabled)
-events, _ := client.GetTrafficEvents(ctx, bramble.GetTrafficEventsParams{})
+events, _ := client.TrafficEvents(ctx, bramble.TrafficEventsParams{})
 fmt.Println("events:", events.Returned)
 
 // Beacon policy: read then update
-bp, _ := client.GetBeaconPolicy(ctx)
+bp, _ := client.BeaconPolicy(ctx)
 fmt.Println("beacon active mode:", bp.Status.ActiveMode)
 enabled := true
 base := 5000
 _ = client.SetBeaconPolicy(ctx, bramble.SetBeaconPolicyParams{Enabled: &enabled, BaseIntervalMs: &base})
 
 // Auth token round-trip (read over serial, apply to WS client)
-token, _ := client.GetAuthToken(ctx)
+token, _ := client.AuthToken(ctx)
 _ = client.SetAuthToken(ctx, token)
 
 // Broadcast telemetry mode
@@ -170,8 +169,10 @@ _ = client.SetMuted(ctx, false)
 | `OnTrafficEvent(fn)` | `func(TrafficEvent)` | Real-time traffic debug event notifications |
 | `OnBroadcastDelivery(fn)` | `func(BroadcastDelivery)` | Broadcast delivery telemetry notifications |
 | `OnWifiEvent(fn)` | `func(WifiEvent)` | Wi-Fi state change notifications |
-| `OnGpsEvent(fn)` | `func(GpsEvent)` | GPS state/position notifications |
+| `OnGPSEvent(fn)` | `func(GPSEvent)` | GPS state/position notifications |
 | `OnLocationEvent(fn)` | `func(LocationEvent)` | Location sharing event notifications |
+| `OnPeerLocation(fn)` | `func(PeerLocationEvent)` | Peer location cache update notifications (no payload; call `PeerLocations`) |
+| `OnIdentityChange(fn)` | `func(IdentityChangeEvent)` | Node identity regeneration notifications (address collision) |
 | `OnDecodeError(fn)` | `func(method string, err error, payload []byte)` | Called when a notification's JSON payload cannot be decoded |
 
 ```go
@@ -222,13 +223,14 @@ msg.ActionText() // "waves hello"
 
 BLE support is implemented via NUS (Nordic UART Service), using newline-delimited JSON-RPC over BLE notifications and writes.
 
-Constructor and config:
+Constructor and options:
 
 ```go
-ble := transport.NewBLE(transport.BLEConfig{
-    DeviceName:  "Bramble",         // optional; empty means auto-scan first matching NUS device
-    ScanTimeout: 15 * time.Second,   // optional; default is 10s
-})
+// Device name is positional; empty string means auto-scan for the first NUS device.
+ble := transport.NewBLE("Bramble",
+    transport.WithBLEScanTimeout(15*time.Second), // optional; default is 10s
+    transport.WithAuthToken("secret"),            // optional; only if firmware requires auth
+)
 client := bramble.NewClient(ble)
 ```
 
@@ -236,8 +238,8 @@ Practical notes:
 
 - Platform support depends on your host BLE stack (`tinygo.org/x/bluetooth` backend).
 - On Linux, ensure Bluetooth is enabled and your user has permission to access BLE (typically BlueZ/dbus configuration).
-- If `DeviceName` is set, scan matching uses case-insensitive substring matching.
-- If `DeviceName` is empty, the transport scans for the first device advertising Bramble NUS service.
+- If a device name is given, scan matching uses case-insensitive substring matching.
+- If the device name is empty, the transport scans for the first device advertising the Bramble NUS service.
 - Pairing/bonding behavior is OS-level; complete pairing first if your platform requires it.
 - BLE throughput/latency is lower than serial/WebSocket; set realistic RPC deadlines.
 
@@ -247,7 +249,7 @@ Minimal BLE connect example:
 ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 defer cancel()
 
-ble := transport.NewBLE(transport.BLEConfig{DeviceName: "Bramble"})
+ble := transport.NewBLE("Bramble")
 client := bramble.NewClient(ble)
 
 if err := client.Connect(ctx); err != nil {

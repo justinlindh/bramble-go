@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/justinlindh/bramble-go/transport"
+	"github.com/justinlindh/bramble-go/transport/transporttest"
 )
 
 // setupRawClient creates a Client with mock transport without running Connect.
-func setupRawClient(t *testing.T) (*Client, *transport.MockTransport) {
+func setupRawClient(t *testing.T) (*Client, *transporttest.Mock) {
 	t.Helper()
-	mock := transport.NewMock()
+	mock := transporttest.NewMock()
 	ctx := context.Background()
 	if err := mock.Connect(ctx); err != nil {
 		t.Fatalf("mock.Connect: %v", err)
@@ -25,7 +25,7 @@ func setupRawClient(t *testing.T) (*Client, *transport.MockTransport) {
 }
 
 func TestClient_Connect(t *testing.T) {
-	mock := transport.NewMock()
+	mock := transporttest.NewMock()
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"firmware_version":"0.1.0","protocol_version":"0.1.0","hardware":"heltec_v3"}}`)
 	c := NewClient(mock)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -37,7 +37,7 @@ func TestClient_Connect(t *testing.T) {
 }
 
 func TestClient_Connect_Incompatible(t *testing.T) {
-	mock := transport.NewMock()
+	mock := transporttest.NewMock()
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"firmware_version":"99.0.0","protocol_version":"99.0.0","hardware":"esp32"}}`)
 	c := NewClient(mock)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -71,7 +71,7 @@ func TestClient_Status(t *testing.T) {
 	}
 }
 
-func TestClient_GetWifiStatus(t *testing.T) {
+func TestClient_WifiStatus(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer func() { _ = c.Close() }()
 
@@ -80,9 +80,9 @@ func TestClient_GetWifiStatus(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	status, err := c.GetWifiStatus(ctx)
+	status, err := c.WifiStatus(ctx)
 	if err != nil {
-		t.Fatalf("GetWifiStatus error: %v", err)
+		t.Fatalf("WifiStatus error: %v", err)
 	}
 	if status.Mode != "station" {
 		t.Errorf("mode: got %q, want station", status.Mode)
@@ -112,7 +112,7 @@ func TestClient_GetWifiStatus(t *testing.T) {
 	}
 }
 
-func TestClient_GetDiagnostics(t *testing.T) {
+func TestClient_Diagnostics(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer func() { _ = c.Close() }()
 
@@ -121,9 +121,9 @@ func TestClient_GetDiagnostics(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	d, err := c.GetDiagnostics(ctx, true)
+	d, err := c.Diagnostics(ctx, true)
 	if err != nil {
-		t.Fatalf("GetDiagnostics error: %v", err)
+		t.Fatalf("Diagnostics error: %v", err)
 	}
 	if d.UptimeS != 1234 {
 		t.Fatalf("uptime_s: got %v, want 1234", d.UptimeS)
@@ -147,7 +147,7 @@ func TestClient_GetDiagnostics(t *testing.T) {
 	}
 }
 
-func TestClient_GetDiagnostics_DefaultParamsEmptyObject(t *testing.T) {
+func TestClient_Diagnostics_DefaultParamsEmptyObject(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer func() { _ = c.Close() }()
 
@@ -156,9 +156,9 @@ func TestClient_GetDiagnostics_DefaultParamsEmptyObject(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	_, err := c.GetDiagnostics(ctx, false)
+	_, err := c.Diagnostics(ctx, false)
 	if err != nil {
-		t.Fatalf("GetDiagnostics error: %v", err)
+		t.Fatalf("Diagnostics error: %v", err)
 	}
 
 	sent := mock.Sent()
@@ -217,24 +217,6 @@ func TestClient_Send(t *testing.T) {
 	result, err := c.Send(ctx, 0x12345678, "hello mesh")
 	if err != nil {
 		t.Fatalf("Send error: %v", err)
-	}
-	if result.Status != "sent" {
-		t.Errorf("status: got %q, want sent", result.Status)
-	}
-}
-
-func TestClient_Broadcast(t *testing.T) {
-	c, mock := setupRawClient(t)
-	defer func() { _ = c.Close() }()
-
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"message_id":"TODO","status":"sent"}}`)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	result, err := c.Broadcast(ctx, "hello everyone")
-	if err != nil {
-		t.Fatalf("Broadcast error: %v", err)
 	}
 	if result.Status != "sent" {
 		t.Errorf("status: got %q, want sent", result.Status)
@@ -397,12 +379,12 @@ func TestClient_OnWifiEvent(t *testing.T) {
 	}
 }
 
-func TestClient_OnGpsEvent(t *testing.T) {
+func TestClient_OnGPSEvent(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer func() { _ = c.Close() }()
 
-	received := make(chan GpsEvent, 1)
-	c.OnGpsEvent(func(e GpsEvent) { received <- e })
+	received := make(chan GPSEvent, 1)
+	c.OnGPSEvent(func(e GPSEvent) { received <- e })
 	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onGpsEvent","params":{"event":"fix_acquired","valid":true,"lat":37.1,"lon":-122.2}}`)
 
 	select {
@@ -411,7 +393,7 @@ func TestClient_OnGpsEvent(t *testing.T) {
 			t.Fatalf("unexpected gps event: %+v", evt)
 		}
 	case <-time.After(2 * time.Second):
-		t.Fatal("timed out waiting for OnGpsEvent callback")
+		t.Fatal("timed out waiting for OnGPSEvent callback")
 	}
 }
 
@@ -577,7 +559,7 @@ func TestClient_RPCError(t *testing.T) {
 	}
 }
 
-func TestClient_GetAuthToken(t *testing.T) {
+func TestClient_AuthToken(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer func() { _ = c.Close() }()
 
@@ -585,9 +567,9 @@ func TestClient_GetAuthToken(t *testing.T) {
 	defer cancel()
 
 	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"token":"pairing-token"}}`)
-	token, err := c.GetAuthToken(ctx)
+	token, err := c.AuthToken(ctx)
 	if err != nil {
-		t.Fatalf("GetAuthToken error: %v", err)
+		t.Fatalf("AuthToken error: %v", err)
 	}
 	if token != "pairing-token" {
 		t.Fatalf("token: got %q, want pairing-token", token)

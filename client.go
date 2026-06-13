@@ -22,7 +22,7 @@ type Client struct {
 	onTrafficEventFn      func(TrafficEvent)
 	onBroadcastDeliveryFn func(BroadcastDelivery)
 	onWifiEventFn         func(WifiEvent)
-	onGpsEventFn          func(GpsEvent)
+	onGPSEventFn          func(GPSEvent)
 	onLocationEventFn     func(LocationEvent)
 	onProbeResultFn       func(ProbeResult)
 	onProbeCompleteFn     func(ProbeComplete)
@@ -126,7 +126,7 @@ func (c *Client) notifyLoop() {
 		onTraffic := c.onTrafficEventFn
 		onBroadcastDelivery := c.onBroadcastDeliveryFn
 		onWifi := c.onWifiEventFn
-		onGps := c.onGpsEventFn
+		onGPS := c.onGPSEventFn
 		onLocation := c.onLocationEventFn
 		onProbeResult := c.onProbeResultFn
 		onProbeComplete := c.onProbeCompleteFn
@@ -176,10 +176,10 @@ func (c *Client) notifyLoop() {
 				}
 			}
 		case "bramble.onGpsEvent":
-			if onGps != nil {
-				var evt GpsEvent
+			if onGPS != nil {
+				var evt GPSEvent
 				if c.notifyDecode(n.Method, n.Params, &evt, onDecodeError) {
-					onGps(evt)
+					onGPS(evt)
 				}
 			}
 		case "bramble.onLocationEvent":
@@ -234,8 +234,8 @@ func (c *Client) Status(ctx context.Context) (*StatusResponse, error) {
 	return &resp, nil
 }
 
-// GetWifiStatus returns current WiFi mode, link, and AP client information.
-func (c *Client) GetWifiStatus(ctx context.Context) (*WifiStatus, error) {
+// WifiStatus returns current WiFi mode, link, and AP client information.
+func (c *Client) WifiStatus(ctx context.Context) (*WifiStatus, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getWifiStatus", nil)
 	if err != nil {
 		return nil, fmt.Errorf("bramble: get wifi status: %w", err)
@@ -247,8 +247,8 @@ func (c *Client) GetWifiStatus(ctx context.Context) (*WifiStatus, error) {
 	return &resp, nil
 }
 
-// GetBattery returns battery voltage in mV and charge percentage.
-func (c *Client) GetBattery(ctx context.Context) (*BatteryStatus, error) {
+// Battery returns battery voltage in mV and charge percentage.
+func (c *Client) Battery(ctx context.Context) (*BatteryStatus, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getBattery", nil)
 	if err != nil {
 		return nil, fmt.Errorf("bramble: get battery: %w", err)
@@ -260,21 +260,21 @@ func (c *Client) GetBattery(ctx context.Context) (*BatteryStatus, error) {
 	return &resp, nil
 }
 
-// GetGpsPosition returns current GPS position when available.
-func (c *Client) GetGpsPosition(ctx context.Context) (*GpsPosition, error) {
+// GPSPosition returns current GPS position when available.
+func (c *Client) GPSPosition(ctx context.Context) (*GPSPosition, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getGpsPosition", nil)
 	if err != nil {
 		return nil, fmt.Errorf("bramble: get gps position: %w", err)
 	}
-	var resp GpsPosition
+	var resp GPSPosition
 	if err := json.Unmarshal(raw, &resp); err != nil {
-		return nil, fmt.Errorf("bramble: decode GpsPosition: %w", err)
+		return nil, fmt.Errorf("bramble: decode GPSPosition: %w", err)
 	}
 	return &resp, nil
 }
 
-// GetBeaconPolicy returns beacon policy config and runtime status.
-func (c *Client) GetBeaconPolicy(ctx context.Context) (*BeaconPolicyResponse, error) {
+// BeaconPolicy returns beacon policy config and runtime status.
+func (c *Client) BeaconPolicy(ctx context.Context) (*BeaconPolicyResponse, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getBeaconPolicy", nil)
 	if err != nil {
 		return nil, fmt.Errorf("bramble: get beacon policy: %w", err)
@@ -286,8 +286,8 @@ func (c *Client) GetBeaconPolicy(ctx context.Context) (*BeaconPolicyResponse, er
 	return &resp, nil
 }
 
-// GetAudioStatus returns current audio availability, volume, mute, and playback state.
-func (c *Client) GetAudioStatus(ctx context.Context) (*AudioStatus, error) {
+// AudioStatus returns current audio availability, volume, mute, and playback state.
+func (c *Client) AudioStatus(ctx context.Context) (*AudioStatus, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getAudioStatus", nil)
 	if err != nil {
 		return nil, fmt.Errorf("bramble: get audio status: %w", err)
@@ -299,8 +299,8 @@ func (c *Client) GetAudioStatus(ctx context.Context) (*AudioStatus, error) {
 	return &resp, nil
 }
 
-// GetStorageInfo returns board storage status (e.g. SD card presence).
-func (c *Client) GetStorageInfo(ctx context.Context) (*StorageInfo, error) {
+// StorageInfo returns board storage status (e.g. SD card presence).
+func (c *Client) StorageInfo(ctx context.Context) (*StorageInfo, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getStorageInfo", nil)
 	if err != nil {
 		return nil, fmt.Errorf("bramble: get storage info: %w", err)
@@ -312,8 +312,8 @@ func (c *Client) GetStorageInfo(ctx context.Context) (*StorageInfo, error) {
 	return &resp, nil
 }
 
-// GetDiagnostics returns runtime heap diagnostics and task stack high-water marks.
-func (c *Client) GetDiagnostics(ctx context.Context, includeHeapDump bool) (*DiagnosticsResponse, error) {
+// Diagnostics returns runtime heap diagnostics and task stack high-water marks.
+func (c *Client) Diagnostics(ctx context.Context, includeHeapDump bool) (*DiagnosticsResponse, error) {
 	params := map[string]any{}
 	if includeHeapDump {
 		params["include_heap_dump"] = true
@@ -510,12 +510,6 @@ func (c *Client) SendBroadcastCritical(ctx context.Context, text string) (*SendR
 	return c.sendBroadcastWithParams(ctx, params)
 }
 
-// Broadcast sends a text message to all peers on the public channel.
-// Deprecated: Broadcast is a legacy alias kept for compatibility. Use SendBroadcast instead.
-func (c *Client) Broadcast(ctx context.Context, text string) (*SendResult, error) {
-	return c.SendBroadcast(ctx, text)
-}
-
 // BroadcastOnChannel sends a mesh-wide message on the specified channel index.
 // This uses bramble.sendMessage with dest=0xFFFFFFFE (channel broadcast alias).
 func (c *Client) BroadcastOnChannel(ctx context.Context, channel int, text string) (*SendResult, error) {
@@ -598,18 +592,12 @@ func (c *Client) SetRadio(ctx context.Context, config RadioConfig) error {
 	}
 	if config.BwHz != nil {
 		params["bw_hz"] = *config.BwHz
-	} else if config.BwKhz != nil {
-		// Deprecated path: convert kHz → Hz for firmware.
-		params["bw_hz"] = *config.BwKhz * 1000
 	}
 	if config.CR != nil {
 		params["coding_rate"] = *config.CR
 	}
 	if config.FrequencyMhz != nil {
 		params["frequency_mhz"] = *config.FrequencyMhz
-	} else if config.FreqMhz != nil {
-		// Deprecated path: same unit, just aliased field name.
-		params["frequency_mhz"] = *config.FreqMhz
 	}
 
 	raw, err := c.proto.Call(ctx, "bramble.setRadio", params)
@@ -628,9 +616,9 @@ func (c *Client) SetNodeName(ctx context.Context, name string) error {
 	return checkOK(raw, "setNodeName")
 }
 
-// GetAuthToken retrieves the device's WebSocket auth token.
+// AuthToken retrieves the device's WebSocket auth token.
 // Typically called over serial since WS connections require the token to connect.
-func (c *Client) GetAuthToken(ctx context.Context) (string, error) {
+func (c *Client) AuthToken(ctx context.Context) (string, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getAuthToken", nil)
 	if err != nil {
 		return "", err
@@ -892,29 +880,29 @@ func (c *Client) SetTrafficDebug(ctx context.Context, params SetTrafficDebugPara
 	return &resp, nil
 }
 
-// GetTrafficDebug returns the current traffic debug configuration and buffer state.
-func (c *Client) GetTrafficDebug(ctx context.Context) (*GetTrafficDebugResponse, error) {
+// TrafficDebug returns the current traffic debug configuration and buffer state.
+func (c *Client) TrafficDebug(ctx context.Context) (*TrafficDebugResponse, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getTrafficDebug", nil)
 	if err != nil {
 		return nil, err
 	}
-	var resp GetTrafficDebugResponse
+	var resp TrafficDebugResponse
 	if err := json.Unmarshal(raw, &resp); err != nil {
-		return nil, fmt.Errorf("bramble: decode GetTrafficDebugResponse: %w", err)
+		return nil, fmt.Errorf("bramble: decode TrafficDebugResponse: %w", err)
 	}
 	return &resp, nil
 }
 
-// GetTrafficEvents retrieves traffic events from the ring buffer.
+// TrafficEvents retrieves traffic events from the ring buffer.
 // Use params.SinceSeq to request only new events (incremental pull).
-func (c *Client) GetTrafficEvents(ctx context.Context, params GetTrafficEventsParams) (*GetTrafficEventsResponse, error) {
+func (c *Client) TrafficEvents(ctx context.Context, params TrafficEventsParams) (*TrafficEventsResponse, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getTrafficEvents", params)
 	if err != nil {
 		return nil, err
 	}
-	var resp GetTrafficEventsResponse
+	var resp TrafficEventsResponse
 	if err := json.Unmarshal(raw, &resp); err != nil {
-		return nil, fmt.Errorf("bramble: decode GetTrafficEventsResponse: %w", err)
+		return nil, fmt.Errorf("bramble: decode TrafficEventsResponse: %w", err)
 	}
 	return &resp, nil
 }
@@ -978,10 +966,10 @@ func (c *Client) OnWifiEvent(fn func(WifiEvent)) {
 	c.mu.Unlock()
 }
 
-// OnGpsEvent registers a callback invoked when a bramble.onGpsEvent notification arrives.
-func (c *Client) OnGpsEvent(fn func(GpsEvent)) {
+// OnGPSEvent registers a callback invoked when a bramble.onGpsEvent notification arrives.
+func (c *Client) OnGPSEvent(fn func(GPSEvent)) {
 	c.mu.Lock()
-	c.onGpsEventFn = fn
+	c.onGPSEventFn = fn
 	c.mu.Unlock()
 }
 

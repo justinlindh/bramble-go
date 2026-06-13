@@ -1,4 +1,3 @@
-//nolint:staticcheck // SA1019: tests intentionally exercise legacy nhooyr/websocket API used by production transport until migration is completed.
 package transport
 
 import (
@@ -13,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"nhooyr.io/websocket"
+	"github.com/coder/websocket"
 )
 
 func TestWebSocketReconnectBackoffAndCallbacks(t *testing.T) {
