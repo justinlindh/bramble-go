@@ -343,6 +343,48 @@ func (c *Client) Identity(ctx context.Context) (*IdentityResponse, error) {
 	return &resp, nil
 }
 
+// SetAnchor provisions the fleet anchor public key (64 hex chars) on the
+// node. Only anchor-endorsed identities pin on an anchored node; a node with
+// no anchor keeps TOFU behavior. The anchor PUBLIC key only: the anchor
+// private key never leaves the operator's client.
+func (c *Client) SetAnchor(ctx context.Context, anchorPubHex string) error {
+	raw, err := c.proto.Call(ctx, "bramble.setAnchor", map[string]string{"anchor_pubkey": anchorPubHex})
+	if err != nil {
+		return err
+	}
+	return checkOK(raw, "setAnchor")
+}
+
+// AnchorStatus reports whether an anchor is provisioned on the node, its
+// fingerprint, and whether the node currently holds a valid endorsement cert.
+func (c *Client) AnchorStatus(ctx context.Context) (*AnchorStatusResponse, error) {
+	raw, err := c.proto.Call(ctx, "bramble.getAnchorStatus", nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp AnchorStatusResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode AnchorStatusResponse: %w", err)
+	}
+	return &resp, nil
+}
+
+// SetEndorsement applies an anchor-signed endorsement cert to the node. The
+// node self-verifies the cert against its own identity key and the currently
+// provisioned anchor before persisting; an invalid cert is rejected.
+// notAfterHex is 16 hex chars (big-endian uint64; "ffffffffffffffff" =
+// permanent); sigHex is 128 hex chars (the 64-byte Ed25519 signature).
+func (c *Client) SetEndorsement(ctx context.Context, notAfterHex, sigHex string) error {
+	raw, err := c.proto.Call(ctx, "bramble.setEndorsement", map[string]string{
+		"not_after":       notAfterHex,
+		"endorsement_sig": sigHex,
+	})
+	if err != nil {
+		return err
+	}
+	return checkOK(raw, "setEndorsement")
+}
+
 // Version returns firmware version, protocol version, and hardware identifier.
 func (c *Client) Version(ctx context.Context) (*VersionResponse, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getVersion", nil)

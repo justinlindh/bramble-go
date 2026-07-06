@@ -169,6 +169,19 @@ type DiagnosticsResponse struct {
 type IdentityResponse struct {
 	Address    string `json:"address"`
 	PubkeyHash string `json:"pubkey_hash"`
+	// Ed25519Pub is the node's full Ed25519 identity public key (64 hex
+	// chars). Added with the trust-anchor feature; empty on older firmware.
+	Ed25519Pub string `json:"ed25519_pub,omitempty"`
+}
+
+// AnchorStatusResponse is returned by bramble.getAnchorStatus. Anchored
+// reports whether a fleet anchor public key is provisioned on the node;
+// Endorsed reports whether the node holds a cert that verifies against the
+// currently provisioned anchor and this node's own key.
+type AnchorStatusResponse struct {
+	Anchored          bool   `json:"anchored"`
+	AnchorFingerprint string `json:"anchor_fingerprint,omitempty"`
+	Endorsed          bool   `json:"endorsed"`
 }
 
 // VersionResponse is returned by bramble.getVersion.
