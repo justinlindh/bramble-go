@@ -262,6 +262,16 @@ type Message struct {
 	Timestamp int64  `json:"timestamp_s"`
 	MsgID     string `json:"msg_id,omitempty"`
 	Status    string `json:"status,omitempty"`
+	// Broadcast reports whether the message was addressed to every node rather
+	// than to a single peer or a channel. It is the authoritative routing
+	// signal on the live bramble.onMessage notification, which does NOT carry a
+	// "to" field, so callers must classify DM vs broadcast on this flag (and
+	// Channel), not on To.
+	Broadcast bool `json:"broadcast,omitempty"`
+	// Channel is the mesh channel index for a channel message. The firmware
+	// reports -1 (or 0) for DMs and plain broadcasts; a value greater than 0
+	// identifies a channel message.
+	Channel int `json:"channel,omitempty"`
 }
 
 // AirtimeTier holds the airtime budget for a single priority tier.

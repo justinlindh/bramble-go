@@ -29,6 +29,47 @@ func TestMessageMarshalOmitsEmptyOptionalFields(t *testing.T) {
 	}
 }
 
+func TestMessageDecodesRoutingFields(t *testing.T) {
+	// A live bramble.onMessage DM: no "to" field, broadcast:false, channel:-1.
+	dm := []byte(`{"from":"CAFEBABE","text":"hi","channel":-1,"broadcast":false}`)
+	var m Message
+	if err := json.Unmarshal(dm, &m); err != nil {
+		t.Fatalf("unmarshal DM: %v", err)
+	}
+	if m.To != "" {
+		t.Fatalf("DM notification has no 'to'; got To=%q", m.To)
+	}
+	if m.Broadcast {
+		t.Fatal("DM must not be flagged Broadcast")
+	}
+	if m.Channel > 0 {
+		t.Fatalf("DM must not have a channel; got %d", m.Channel)
+	}
+
+	// A broadcast notification.
+	bc := []byte(`{"from":"CAFEBABE","text":"yo","channel":-1,"broadcast":true}`)
+	var mb Message
+	if err := json.Unmarshal(bc, &mb); err != nil {
+		t.Fatalf("unmarshal broadcast: %v", err)
+	}
+	if !mb.Broadcast {
+		t.Fatal("broadcast must be flagged Broadcast")
+	}
+
+	// A channel message.
+	ch := []byte(`{"from":"CAFEBABE","text":"c","channel":3,"broadcast":false}`)
+	var mc Message
+	if err := json.Unmarshal(ch, &mc); err != nil {
+		t.Fatalf("unmarshal channel: %v", err)
+	}
+	if mc.Broadcast {
+		t.Fatal("channel message must not be Broadcast")
+	}
+	if mc.Channel != 3 {
+		t.Fatalf("channel = %d, want 3", mc.Channel)
+	}
+}
+
 func TestRadioConfigMarshalPointers(t *testing.T) {
 	sf := 9
 	freq := 915.5
