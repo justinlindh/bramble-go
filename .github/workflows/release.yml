@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Run semantic-release in dry-run mode (no tags/releases)
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '20'
+  SEMREL_VERSION: '24'
+  SEMREL_COMMIT_ANALYZER_VERSION: '13'
+  SEMREL_NOTES_GENERATOR_VERSION: '14'
+  SEMREL_GITHUB_VERSION: '11'
+
+jobs:
+  semantic-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install semantic-release dependencies (pinned)
+        run: |
+          set -euo pipefail
+          npm install --no-save \
+            "semantic-release@${SEMREL_VERSION}" \
+            "@semantic-release/commit-analyzer@${SEMREL_COMMIT_ANALYZER_VERSION}" \
+            "@semantic-release/release-notes-generator@${SEMREL_NOTES_GENERATOR_VERSION}" \
+            "@semantic-release/github@${SEMREL_GITHUB_VERSION}"
+
+      - name: Run semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          # semantic-release auto-discovers .releaserc.cjs (the frozen Gitea
+          # config, which requires GITEA_TOKEN). Swap in the GitHub config as the
+          # default name inside this ephemeral checkout so the GitHub plugin runs.
+          cp .releaserc.github.cjs .releaserc.cjs
+          dry_flag=""
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "${INPUT_DRY_RUN:-false}" = "true" ]; then
+            echo "Running semantic-release in --dry-run mode (manual dispatch input dry_run=true)."
+            dry_flag="--dry-run"
+          fi
+          npx semantic-release $dry_flag

@@ -1,0 +1,23 @@
+name: Internal Refs
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  check-no-internal-refs:
+    name: check-no-internal-refs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run internal-refs gate
+        run: scripts/check-no-internal-refs.sh

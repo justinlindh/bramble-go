@@ -1,7 +1,11 @@
-const giteaUrl = process.env.GITEA_URL || 'https://github.com';
+const giteaUrl = process.env.GITEA_URL;
 
 if (!process.env.GITEA_TOKEN) {
   throw new Error('GITEA_TOKEN is required for semantic-release');
+}
+
+if (!giteaUrl) {
+  throw new Error('GITEA_URL is required for the Gitea semantic-release config');
 }
 
 module.exports = {
