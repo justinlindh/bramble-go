@@ -75,7 +75,7 @@ func TestClient_WifiStatus(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer func() { _ = c.Close() }()
 
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"mode":"station","ssid":"meshnet","ip":"192.0.2.0","rssi":-57,"mac":"AA:BB:CC:DD:EE:FF","clients":0}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"result":{"mode":"station","ssid":"meshnet","ip":"192.0.2.8","rssi":-57,"mac":"AA:BB:CC:DD:EE:FF","clients":0}}`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -90,8 +90,8 @@ func TestClient_WifiStatus(t *testing.T) {
 	if status.SSID != "meshnet" {
 		t.Errorf("ssid: got %q, want meshnet", status.SSID)
 	}
-	if status.IP != "192.0.2.0" {
-		t.Errorf("ip: got %q, want 192.0.2.0", status.IP)
+	if status.IP != "192.0.2.8" {
+		t.Errorf("ip: got %q, want 192.0.2.8", status.IP)
 	}
 	if status.RSSI != -57 {
 		t.Errorf("rssi: got %d, want -57", status.RSSI)
@@ -367,11 +367,11 @@ func TestClient_OnWifiEvent(t *testing.T) {
 
 	received := make(chan WifiEvent, 1)
 	c.OnWifiEvent(func(e WifiEvent) { received <- e })
-	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onWifiEvent","params":{"event":"connected","mode":"sta","connected":true,"ip":"192.0.2.0"}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","method":"bramble.onWifiEvent","params":{"event":"connected","mode":"sta","connected":true,"ip":"192.0.2.8"}}`)
 
 	select {
 	case evt := <-received:
-		if evt.Event != "connected" || evt.IP != "192.0.2.0" {
+		if evt.Event != "connected" || evt.IP != "192.0.2.8" {
 			t.Fatalf("unexpected wifi event: %+v", evt)
 		}
 	case <-time.After(2 * time.Second):
@@ -476,7 +476,7 @@ func TestClient_OTAUpdate(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
-	resp, err := c.OTAUpdate(ctx, "http://192.0.2.0:8088/bramble.bin")
+	resp, err := c.OTAUpdate(ctx, "http://192.0.2.2:8088/bramble.bin")
 	if err != nil {
 		t.Fatalf("OTAUpdate error: %v", err)
 	}
@@ -497,7 +497,7 @@ func TestClient_OTAUpdate(t *testing.T) {
 	if !strings.Contains(sent[0], `"method":"bramble.otaUpdate"`) {
 		t.Fatalf("expected bramble.otaUpdate request, got: %s", sent[0])
 	}
-	if !strings.Contains(sent[0], `"url":"http://192.0.2.0:8088/bramble.bin"`) {
+	if !strings.Contains(sent[0], `"url":"http://192.0.2.2:8088/bramble.bin"`) {
 		t.Fatalf("expected URL param in request, got: %s", sent[0])
 	}
 }
