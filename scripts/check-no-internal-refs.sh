@@ -14,7 +14,7 @@ SELF='scripts/check-no-internal-refs.sh'
 fail=0
 
 # Internal hostnames, the fleet secrets dir, and personal absolute paths.
-word_hits="$(git grep -nIE 'example|justinlindh|host|bramble-meta|/home/user' -- . ":!$SELF" 2>/dev/null || true)"
+word_hits="$(git grep -nIE 'example|justinlindh|host|bramble-meta|/home/justin' -- . ":!$SELF" 2>/dev/null || true)"
 if [ -n "$word_hits" ]; then
   echo "ERROR: internal infrastructure references found:" >&2
   echo "$word_hits" >&2
