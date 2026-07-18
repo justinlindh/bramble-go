@@ -1,35 +1,51 @@
 #!/usr/bin/env bash
+# Anti-regression gate: fails if the tracked tree carries references to the
+# maintainer's private infrastructure, home network, or bench hardware. A
+# public repo must never carry these. Scans ALL tracked files including
+# markdown. This gate was hardened after an audit found leak classes the
+# original missed (MACs, real device addresses, home room names).
 #
-# Fail if any tracked file leaks internal infrastructure into this public repo.
-# Run locally or in CI; exits non-zero if anything is found. Scans ALL tracked
-# files including markdown (public docs must never carry these either).
-#
-# The only private-range address that is allowed is the Bramble node SoftAP
-# default gateway 192.168.4.x, which is a product constant, not a real host.
+# Allowed: the ESP32 SoftAP default gateway range 192.168.4.x (a product
+# constant), the RFC1918 range definition 192.168.0.0/16 inside the proxy
+# target-policy source, and clearly-fake documentation placeholders
+# (RFC5737 IPs 192.0.2.x etc., MAC AA:BB:CC:..., hex DEADBEEF/CAFEBABE...).
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(git rev-parse --show-toplevel)"
 
-SELF='scripts/check-no-internal-refs.sh'
+self="scripts/check-no-internal-refs.sh"
 fail=0
+report() { printf 'check-no-internal-refs: %s:\n%s\n' "$1" "$2" >&2; fail=1; }
 
-# Internal hostnames, the fleet secrets dir, and personal absolute paths.
-word_hits="$(git grep -nIE 'example|justinlindh|host|bramble-meta|/home/justin' -- . ":!$SELF" 2>/dev/null || true)"
-if [ -n "$word_hits" ]; then
-  echo "ERROR: internal infrastructure references found:" >&2
-  echo "$word_hits" >&2
-  fail=1
-fi
+# 1. Internal hostnames, fleet secrets dir, personal absolute paths.
+h="$(git grep -nIE 'idiotica|dumbot|openclaw|bramble-meta|/home/justin' -- . ":!${self}" || true)"
+[[ -n "$h" ]] && report "internal infra references" "$h"
 
-# Any private 192.168.x.x address except the ESP32 SoftAP range 192.168.4.x.
-ip_hits="$(git grep -nIE '192\.168\.[0-9]+\.[0-9]+' -- . ":!$SELF" 2>/dev/null | grep -vE '192\.168\.4\.' || true)"
-if [ -n "$ip_hits" ]; then
-  echo "ERROR: private LAN address (outside the ESP32 AP range) found:" >&2
-  echo "$ip_hits" >&2
-  fail=1
-fi
+# 2. Private 192.168.x.x except the ESP32 SoftAP 192.168.4.x. The proxy
+#    target-policy source legitimately defines the RFC1918 range.
+h="$(git grep -nIE '192\.168\.[0-9]+\.[0-9]+' -- . ":!${self}" ':!webapp/server/target-policy.mjs' | grep -vE '192\.168\.4\.' || true)"
+[[ -n "$h" ]] && report "private LAN address (outside the ESP32 AP range)" "$h"
 
-if [ "$fail" -ne 0 ]; then
+# 3. Real bench-hardware node addresses (Ed25519-derived 4-byte addresses).
+#    Public docs/tests must use fake hex (DEADBEEF, CAFEBABE, ...).
+h="$(git grep -niIE 'F2BE6EEE|AB246C7C|FEC61437|9CA6A0EE|50D2E1BD' -- . ":!${self}" || true)"
+[[ -n "$h" ]] && report "real bench device address" "$h"
+
+# 4. Home room / location labels used as device names in fixtures.
+h="$(git grep -nIE "\b(Garage|Attic)\b" -- . ":!${self}" || true)"
+[[ -n "$h" ]] && report "home room/location label" "$h"
+
+# 5. MAC addresses, except clearly-fake documentation placeholders.
+h="$(git grep -nIE '([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}' -- . ":!${self}" | grep -viE 'AA:BB:CC:DD:EE|00:00:00:00:00:00|DE:AD:BE:EF|FF:FF:FF:FF:FF:FF' || true)"
+[[ -n "$h" ]] && report "MAC address (use a documentation placeholder like AA:BB:CC:DD:EE:FF)" "$h"
+
+
+# 6b. Home location: neighborhood/city names and precise coordinates from the
+#     maintainer's real area. Public fixtures must use fictional places.
+h="$(git grep -nIE 'Inspirada|Henderson|McCullough|Sloan Canyon|Anthem|35\.9[0-9]{4}|36\.0[0-9]{3}|-11[45]\.[0-9]{3,}|openstreetmap\.org/\?mlat' -- . ":!${self}" ':!hardware/' || true)"
+[[ -n "$h" ]] && report "home location / neighborhood / coordinates" "$h"
+
+if [[ "$fail" -ne 0 ]]; then
   exit 1
 fi
 echo "check-no-internal-refs: clean"
