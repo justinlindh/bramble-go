@@ -140,8 +140,7 @@ cfg, _ := client.SetWifiConfig(ctx, "my-network", "hunter22")
 if cfg.Applied == "reboot_required" {
     _ = client.Reboot(ctx)
 }
-enabled := true
-base := 5000
+enabled, base := true, 5000
 _ = client.SetBeaconPolicy(ctx, bramble.SetBeaconPolicyParams{Enabled: &enabled, BaseIntervalMs: &base})
 
 // Auth token round-trip (read over serial, apply to WS client)
