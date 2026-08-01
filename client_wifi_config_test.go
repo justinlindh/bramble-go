@@ -48,27 +48,6 @@ func TestClient_SetWifiConfig_OpenNetwork(t *testing.T) {
 	}
 }
 
-func TestClient_SetWifiConfig_ValidationErrors(t *testing.T) {
-	c, mock := setupRawClient(t)
-	defer func() { _ = c.Close() }()
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	if _, err := c.SetWifiConfig(ctx, "", "pw"); err == nil {
-		t.Fatal("expected error for empty ssid")
-	}
-	if _, err := c.SetWifiConfig(ctx, strings.Repeat("s", 33), "pw"); err == nil {
-		t.Fatal("expected error for oversized ssid")
-	}
-	if _, err := c.SetWifiConfig(ctx, "net", strings.Repeat("p", 65)); err == nil {
-		t.Fatal("expected error for oversized password")
-	}
-
-	if sent := mock.Sent(); len(sent) != 0 {
-		t.Fatalf("expected no RPC calls for invalid input, got %d", len(sent))
-	}
-}
-
 func TestClient_SetWifiConfig_ServerError(t *testing.T) {
 	c, mock := setupRawClient(t)
 	defer func() { _ = c.Close() }()
@@ -80,5 +59,29 @@ func TestClient_SetWifiConfig_ServerError(t *testing.T) {
 		t.Fatal("expected error for unauthorized response")
 	} else if !strings.Contains(err.Error(), "unauthorized") {
 		t.Fatalf("expected error to mention unauthorized, got %v", err)
+	}
+}
+
+// TestClient_SetWifiConfig_InvalidParamsRejection covers the out-of-bounds
+// ssid/password case: the SDK does no client-side length validation (it
+// sends whatever the caller passes, same as SetNodeName/AddChannel), so an
+// invalid ssid or password is rejected by the firmware's
+// RPC_ERR_INVALID_PARAMS and must propagate as a normal error here.
+func TestClient_SetWifiConfig_InvalidParamsRejection(t *testing.T) {
+	c, mock := setupRawClient(t)
+	defer func() { _ = c.Close() }()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"invalid params"}}`)
+	if _, err := c.SetWifiConfig(ctx, strings.Repeat("s", 33), "pw"); err == nil {
+		t.Fatal("expected error propagated from firmware rejection")
+	} else if !strings.Contains(err.Error(), "invalid params") {
+		t.Fatalf("expected error to mention invalid params, got %v", err)
+	}
+
+	sent := mock.Sent()
+	if len(sent) != 1 || !strings.Contains(sent[0], `"method":"bramble.setWifiConfig"`) {
+		t.Fatalf("expected the RPC call to be sent (no client-side gate), got %v", sent)
 	}
 }

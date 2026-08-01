@@ -247,18 +247,13 @@ func (c *Client) WifiStatus(ctx context.Context) (*WifiStatus, error) {
 	return &resp, nil
 }
 
-// SetWifiConfig provisions WiFi station credentials. Pass an empty password
-// for an open network. Only station mode is supported today; there is no
-// live reconfigure path, so the response's Applied field is always
-// "reboot_required": call Reboot to apply the new credentials.
+// SetWifiConfig provisions WiFi station credentials (ssid 1-32 bytes,
+// password 0-64 bytes; the firmware rejects values outside those bounds).
+// Pass an empty password for an open network. Only station mode is
+// supported today; there is no live reconfigure path, so the response's
+// Applied field is always "reboot_required": call Reboot to apply the new
+// credentials.
 func (c *Client) SetWifiConfig(ctx context.Context, ssid, password string) (*SetWifiConfigResponse, error) {
-	if len(ssid) < 1 || len(ssid) > 32 {
-		return nil, fmt.Errorf("bramble: wifi ssid must be 1-32 bytes, got %d", len(ssid))
-	}
-	if len(password) > 64 {
-		return nil, fmt.Errorf("bramble: wifi password must be at most 64 bytes, got %d", len(password))
-	}
-
 	raw, err := c.proto.Call(ctx, "bramble.setWifiConfig", map[string]string{"ssid": ssid, "password": password})
 	if err != nil {
 		return nil, err
