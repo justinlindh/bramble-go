@@ -88,6 +88,7 @@ fmt.Println("auth token:", token)
 | `SendProbe(ctx)` | `*SendProbeResult` | Network reachability probe |
 | `SetRadio(ctx, config)` | `error` | Update radio parameters |
 | `SetNodeName(ctx, name)` | `error` | Set node display name (max 32 chars) |
+| `SetWifiConfig(ctx, ssid, password)` | `*SetWifiConfigResponse` | Provision Wi-Fi station credentials (empty password = open network) |
 | `AddChannel(ctx, name, psk)` | `*AddChannelResult` | Add a channel |
 | `RemoveChannel(ctx, index)` | `error` | Remove a channel by index |
 | `SetDefaultChannel(ctx, index)` | `error` | Set default outgoing channel |
@@ -133,6 +134,12 @@ fmt.Println("events:", events.Returned)
 // Beacon policy: read then update
 bp, _ := client.BeaconPolicy(ctx)
 fmt.Println("beacon active mode:", bp.Status.ActiveMode)
+
+// Wi-Fi provisioning: persist credentials, then reboot to apply
+cfg, _ := client.SetWifiConfig(ctx, "my-network", "hunter22")
+if cfg.Applied == "reboot_required" {
+    _ = client.Reboot(ctx)
+}
 enabled := true
 base := 5000
 _ = client.SetBeaconPolicy(ctx, bramble.SetBeaconPolicyParams{Enabled: &enabled, BaseIntervalMs: &base})
