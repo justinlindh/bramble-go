@@ -247,6 +247,24 @@ func (c *Client) WifiStatus(ctx context.Context) (*WifiStatus, error) {
 	return &resp, nil
 }
 
+// SetWifiConfig provisions WiFi station credentials (ssid 1-32 bytes,
+// password 0-64 bytes; the firmware rejects values outside those bounds).
+// Pass an empty password for an open network. Only station mode is
+// supported today; there is no live reconfigure path, so the response's
+// Applied field is always "reboot_required": call Reboot to apply the new
+// credentials.
+func (c *Client) SetWifiConfig(ctx context.Context, ssid, password string) (*SetWifiConfigResponse, error) {
+	raw, err := c.proto.Call(ctx, "bramble.setWifiConfig", map[string]string{"ssid": ssid, "password": password})
+	if err != nil {
+		return nil, err
+	}
+	var resp SetWifiConfigResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode SetWifiConfigResponse: %w", err)
+	}
+	return &resp, nil
+}
+
 // Battery returns battery voltage in mV and charge percentage.
 func (c *Client) Battery(ctx context.Context) (*BatteryStatus, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getBattery", nil)

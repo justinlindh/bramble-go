@@ -46,6 +46,12 @@ type WifiStatus struct {
 	Clients int    `json:"clients"`
 }
 
+// SetWifiConfigResponse is returned by bramble.setWifiConfig.
+type SetWifiConfigResponse struct {
+	OK      bool   `json:"ok"`
+	Applied string `json:"applied"` // "live" or "reboot_required"
+}
+
 // BatteryStatus is returned by bramble.getBattery.
 type BatteryStatus struct {
 	VoltageMV  int `json:"voltage_mv"`
