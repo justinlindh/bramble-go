@@ -246,8 +246,23 @@ Practical notes:
 - On Linux, ensure Bluetooth is enabled and your user has permission to access BLE (typically BlueZ/dbus configuration).
 - If a device name is given, scan matching uses case-insensitive substring matching.
 - If the device name is empty, the transport scans for the first device advertising the Bramble NUS service.
-- Pairing/bonding behavior is OS-level; complete pairing first if your platform requires it.
 - BLE throughput/latency is lower than serial/WebSocket; set realistic RPC deadlines.
+
+### Pairing is required
+
+The firmware declares its NUS TX/RX characteristics as encryption-required (`components/ble/ble_server.c`), so BlueZ refuses to write to or notify on them over an unencrypted link. The host must be paired and bonded with the target device before `Connect` is called; this SDK does not attempt to pair automatically (tinygo's BlueZ pairing support is not reliable enough to drive from Go).
+
+Pair once per host/device pair with `bluetoothctl`:
+
+```
+bluetoothctl
+  agent NoInputNoOutput
+  default-agent
+  scan on
+  pair <MAC>
+```
+
+**Symptom of a missing or stale bond**: `Connect` succeeds (scanning and GATT discovery do not require encryption), but every `Send` silently vanishes: no error is returned and the device never responds. This happens because writes use write-without-response, and BlueZ drops the write instead of erroring when it declines to use an unencrypted link. If a device's bond is destroyed after the fact (firmware NVS erase, `bluetoothctl remove`, factory reset), you will see exactly this symptom until you re-pair.
 
 Minimal BLE connect example:
 

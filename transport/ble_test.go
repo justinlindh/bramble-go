@@ -180,6 +180,137 @@ func TestBLENewBLE_MultipleOptions(t *testing.T) {
 	}
 }
 
+// TestNUSUUIDs pins the string form of each NUS UUID against the values the
+// firmware advertises (components/ble/ble_server.c). bluetooth.NewUUID takes
+// its [16]byte argument in big-endian (string) order; a byte-reversed
+// literal compiles fine but produces a UUID that never matches anything
+// advertised over the air. This test would have caught that.
+func TestNUSUUIDs(t *testing.T) {
+	cases := []struct {
+		name string
+		got  bluetooth.UUID
+		want string
+	}{
+		{"service", nusServiceUUID, "6e400001-b5a3-f393-e0a9-e50e24dcca9e"},
+		{"tx", nusTXUUID, "6e400002-b5a3-f393-e0a9-e50e24dcca9e"},
+		{"rx", nusRXUUID, "6e400003-b5a3-f393-e0a9-e50e24dcca9e"},
+	}
+	for _, c := range cases {
+		if got := c.got.String(); got != c.want {
+			t.Errorf("%s UUID = %q, want %q", c.name, got, c.want)
+		}
+	}
+}
+
+func TestValidateBLEAuthAck(t *testing.T) {
+	if err := validateBLEAuthAck([]byte(`{"jsonrpc":"2.0","result":{"ok":true},"id":null}`)); err != nil {
+		t.Fatalf("expected valid ack, got %v", err)
+	}
+	if err := validateBLEAuthAck([]byte(`{"jsonrpc":"2.0","error":{"code":-32603,"message":"unauthorized: first BLE write must be auth token"},"id":null}`)); err == nil {
+		t.Fatal("expected error ack to fail")
+	}
+	if err := validateBLEAuthAck([]byte(`{"jsonrpc":"2.0","result":{"ok":false},"id":null}`)); err == nil {
+		t.Fatal("expected ok:false to fail")
+	}
+	if err := validateBLEAuthAck([]byte(`{"jsonrpc":"2.0","id":null}`)); err == nil {
+		t.Fatal("expected missing result to fail")
+	}
+	if err := validateBLEAuthAck([]byte(`not json`)); err == nil {
+		t.Fatal("expected invalid JSON to fail")
+	}
+}
+
+func TestIsTransientBLEWriteError(t *testing.T) {
+	if isTransientBLEWriteError(nil) {
+		t.Fatal("nil error must not be transient")
+	}
+	if !isTransientBLEWriteError(errors.New("org.bluez.Error.InProgress: In Progress")) {
+		t.Fatal("expected bluez In Progress error to be treated as transient")
+	}
+	if !isTransientBLEWriteError(errors.New("operation already in progress")) {
+		t.Fatal("expected lowercase 'in progress' to be treated as transient")
+	}
+	if isTransientBLEWriteError(ErrNotConnected) {
+		t.Fatal("ErrNotConnected must not be treated as transient")
+	}
+}
+
+func TestRetrySend_SucceedsFirstTry(t *testing.T) {
+	calls := 0
+	sleeps := 0
+	err := retrySend(func() error {
+		calls++
+		return nil
+	}, func(time.Duration) { sleeps++ }, 5, time.Millisecond)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected 1 call, got %d", calls)
+	}
+	if sleeps != 0 {
+		t.Fatalf("expected no sleeps, got %d", sleeps)
+	}
+}
+
+func TestRetrySend_RetriesTransientThenSucceeds(t *testing.T) {
+	calls := 0
+	sleeps := 0
+	err := retrySend(func() error {
+		calls++
+		if calls < 3 {
+			return errors.New("org.bluez.Error.InProgress: In Progress")
+		}
+		return nil
+	}, func(time.Duration) { sleeps++ }, 5, time.Millisecond)
+	if err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+	if calls != 3 {
+		t.Fatalf("expected 3 calls, got %d", calls)
+	}
+	if sleeps != 2 {
+		t.Fatalf("expected 2 sleeps between 3 calls, got %d", sleeps)
+	}
+}
+
+func TestRetrySend_StopsImmediatelyOnNonTransientError(t *testing.T) {
+	calls := 0
+	sleeps := 0
+	wantErr := errors.New("permanent failure")
+	err := retrySend(func() error {
+		calls++
+		return wantErr
+	}, func(time.Duration) { sleeps++ }, 5, time.Millisecond)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected wantErr, got %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected 1 call, got %d", calls)
+	}
+	if sleeps != 0 {
+		t.Fatalf("expected no sleeps, got %d", sleeps)
+	}
+}
+
+func TestRetrySend_GivesUpAfterMaxAttempts(t *testing.T) {
+	calls := 0
+	sleeps := 0
+	err := retrySend(func() error {
+		calls++
+		return errors.New("in progress")
+	}, func(time.Duration) { sleeps++ }, 5, time.Millisecond)
+	if err == nil {
+		t.Fatal("expected error after exhausting retries")
+	}
+	if calls != 5 {
+		t.Fatalf("expected 5 calls, got %d", calls)
+	}
+	if sleeps != 4 {
+		t.Fatalf("expected 4 sleeps between 5 calls, got %d", sleeps)
+	}
+}
+
 func TestValidateAuthResponse(t *testing.T) {
 	if err := validateAuthResponse([]byte(`{"jsonrpc":"2.0","id":0,"result":{"ok":true}}`)); err != nil {
 		t.Fatalf("expected valid auth response, got %v", err)
