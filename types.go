@@ -596,10 +596,18 @@ type LocationChannelTarget struct {
 
 // LocationConfig contains the location configuration for bramble.getConfig and bramble.setLocationConfig.
 type LocationConfig struct {
-	Enabled        *bool                   `json:"enabled,omitempty"`
-	DefaultTier    *string                 `json:"default_tier,omitempty"`
-	IntervalS      *int                    `json:"interval_s,omitempty"`
-	Source         *string                 `json:"source,omitempty"`
+	Enabled     *bool   `json:"enabled,omitempty"`
+	DefaultTier *string `json:"default_tier,omitempty"`
+	IntervalS   *int    `json:"interval_s,omitempty"`
+	Source      *string `json:"source,omitempty"`
+	// Lat and Lon are the manually configured coordinates, present only when
+	// the node has them stored. They are read-only: bramble.getConfig reports
+	// them, bramble.setLocationConfig ignores them. They matter because a node
+	// resolves its own position from live GPS first and falls back to these, so
+	// their absence is what separates "GPS-only node with no fix yet" from
+	// "no position source configured at all".
+	Lat            *float64                `json:"lat,omitempty"`
+	Lon            *float64                `json:"lon,omitempty"`
 	ContactRules   []LocationContactRule   `json:"contact_rules,omitempty"`
 	ChannelTargets []LocationChannelTarget `json:"channel_targets,omitempty"`
 }
