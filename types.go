@@ -249,6 +249,31 @@ type Route struct {
 	UseCount   int    `json:"use_count,omitempty"`
 }
 
+// DmSession is one used slot of the node's DM session table, as returned by
+// bramble.getDmSessions. Metadata only: no key material is ever included.
+type DmSession struct {
+	Address string `json:"address"`
+	// State is "handshaking" or "active". Only "active" can carry a directed
+	// send; a peer in any other state silently drops DMs and per-contact
+	// location shares.
+	State            string `json:"state"`
+	Verified         bool   `json:"verified"`
+	RatchetValid     bool   `json:"ratchet_valid"`
+	MsgCount         int    `json:"msg_count"`
+	KeEpoch          int    `json:"ke_epoch"`
+	EstablishedMsAgo int64  `json:"established_ms_ago"`
+	LastActiveMsAgo  int64  `json:"last_active_ms_ago"`
+}
+
+// Active reports whether this session can carry a directed send right now.
+func (s DmSession) Active() bool { return s.State == "active" }
+
+// DmSessionsResponse is the bramble.getDmSessions result.
+type DmSessionsResponse struct {
+	Sessions []DmSession `json:"sessions"`
+	Capacity int         `json:"capacity"`
+}
+
 // Channel is a configured channel.
 type Channel struct {
 	ID        int    `json:"id"`

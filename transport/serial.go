@@ -18,6 +18,30 @@ var (
 
 const defaultBaudRate = 115200
 
+// serialMode returns the port settings used for both the initial open and
+// every reconnect.
+//
+// InitialStatusBits is the load-bearing part. go.bug.st/serial defaults it to
+// DTR=true and RTS=true, and on a CP2102 (and on the ESP32 auto-reset circuit
+// generally) those two lines drive EN and BOOT: asserting them at open reboots
+// the node. Every command in a CLI built on this transport would therefore
+// reset the device it was querying, which has already made a healthy node look
+// like it was stuck in a boot loop. Nothing here needs hardware flow control or
+// modem signalling, so both lines stay deasserted and opening a port is a
+// read-only act.
+func serialMode(baud int) *serial.Mode {
+	return &serial.Mode{
+		BaudRate: baud,
+		DataBits: 8,
+		Parity:   serial.NoParity,
+		StopBits: serial.OneStopBit,
+		InitialStatusBits: &serial.ModemOutputBits{
+			DTR: false,
+			RTS: false,
+		},
+	}
+}
+
 // Serial is a Transport that communicates with a Bramble node over a UART/serial port.
 // Messages are newline-delimited JSON. Lines not starting with '{' (e.g., ESP-IDF log
 // output and console prompts) are skipped transparently.
@@ -68,14 +92,7 @@ func (s *Serial) Connect(_ context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	mode := &serial.Mode{
-		BaudRate: s.baud,
-		DataBits: 8,
-		Parity:   serial.NoParity,
-		StopBits: serial.OneStopBit,
-	}
-
-	conn, err := serialOpenFunc(s.port, mode)
+	conn, err := serialOpenFunc(s.port, serialMode(s.baud))
 	if err != nil {
 		return fmt.Errorf("bramble/transport/serial: open %s: %w", s.port, err)
 	}
@@ -216,12 +233,7 @@ func (s *Serial) reconnect() error {
 	delay := time.Second
 	const maxDelay = 30 * time.Second
 
-	mode := &serial.Mode{
-		BaudRate: s.baud,
-		DataBits: 8,
-		Parity:   serial.NoParity,
-		StopBits: serial.OneStopBit,
-	}
+	mode := serialMode(s.baud)
 
 	for {
 		select {

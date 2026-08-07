@@ -30,6 +30,7 @@ All methods accept a `context.Context` for timeout/cancellation.
 | `DeliveryEvents(ctx, sinceEventSeq, limit)` | `*DeliveryReplayResponse` | Replay persisted delivery telemetry events |
 | `Neighbors(ctx)` | `[]Neighbor` | Direct radio neighbors (RSSI, SNR, last heard) |
 | `Routes(ctx)` | `[]Route` | Routing table entries |
+| `DmSessions(ctx)` | `*DmSessionsResponse` | DM session table: which peers a directed send can reach |
 | `Airtime(ctx)` | `*AirtimeStats` | Per-tier airtime budget usage |
 | `Ping(ctx)` | `error` | Health check (returns nil on success) |
 | `Messages(ctx)` | `[]Message` | Stored message history |
@@ -43,6 +44,7 @@ All methods accept a `context.Context` for timeout/cancellation.
 | `AudioStatus(ctx)` | `*AudioStatus` | Audio availability, volume, mute, and playback state |
 | `StorageInfo(ctx)` | `*StorageInfo` | Board storage status (SD card presence and mount point) |
 | `AuthToken(ctx)` | `(string, error)` | Retrieve the device's WebSocket auth token (typically over serial) |
+| `Screenshot(ctx)` | `*Screenshot` | Capture the display and reassemble the paged framebuffer |
 
 ### Query Usage Examples
 
@@ -73,7 +75,49 @@ fmt.Printf("SD present=%v mount=%s\n", storage.SDPresent, storage.MountPoint)
 // Retrieve auth token over serial before connecting via WebSocket
 token, _ := client.AuthToken(ctx)
 fmt.Println("auth token:", token)
+
+// Which peers can this node actually send a DM (or a per-contact location
+// share) to right now? A configured peer with no active session is silently
+// unreachable for directed traffic.
+dm, _ := client.DmSessions(ctx)
+for _, s := range dm.Sessions {
+    fmt.Printf("%s active=%v verified=%v\n", s.Address, s.Active(), s.Verified)
+}
+
+// Capture the display. Screenshot issues the capture and pages the whole
+// framebuffer back; Pixels is the raw frame, not an encoded image.
+shot, _ := client.Screenshot(ctx)
+fmt.Printf("%dx%d %s, %d bytes\n", shot.Width, shot.Height, shot.Format, len(shot.Pixels))
 ```
+
+### Screenshot Pixel Format
+
+`Screenshot.Pixels` is the framebuffer exactly as the device holds it. For
+`Format` `"rgb565"` that is two bytes per pixel, row major, and **little
+endian**: the low byte of each pixel comes first.
+
+```go
+// Correct: little endian.
+v := uint16(shot.Pixels[i]) | uint16(shot.Pixels[i+1])<<8
+r := uint8((v>>11)&0x1F) << 3
+g := uint8((v>>5)&0x3F) << 2
+b := uint8(v&0x1F) << 3
+```
+
+Reading those two bytes big endian produces an image with recognisable layout
+and wrong colours (a pink or red cast), which looks like a display or capture
+fault and is not one.
+
+### Raw RPC
+
+Every typed method is a thin wrapper over `Call`, which is exported so a caller
+is never blocked on this SDK catching up with the firmware:
+
+```go
+raw, err := client.Call(ctx, "bramble.someNewMethod", map[string]any{"arg": 1})
+```
+
+Prefer the typed methods where they exist; they pin the response shape.
 
 ## Action Methods
 
