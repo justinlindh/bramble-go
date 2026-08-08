@@ -305,8 +305,10 @@ client.OnProbeResult(func(p bramble.ProbeResult) {
 })
 
 client.OnTrafficEvent(func(e bramble.TrafficEvent) {
-    fmt.Printf("Traffic seq=%d tx=%t len=%d category=%s rssi=%d\n",
-        e.Seq, e.IsTx, e.PacketLen, e.Category, e.RSSI)
+    fmt.Printf("Traffic seq=%d tx=%t len=%d category=%s\n", e.Seq, e.IsTx, e.PacketLen, e.Category)
+    if e.SrcAddr != "" {
+        fmt.Printf("  from %s at %d dBm\n", e.SrcAddr, e.RSSI)
+    }
 })
 
 client.OnDecodeError(func(method string, err error, payload []byte) {
@@ -330,7 +332,7 @@ Some wire fields are optional: firmware omits them when the build has no such su
 - `RadioHealth` (`*DiagnosticsRadioHealth`): what the radio reports about its own transmit path, as generic verdicts (`PAFault`, `PLLFault`, `OscillatorFault`, `CalibrationFault`, `ConfigVerified`) rather than one part's register layout, so they stay meaningful as other radios learn to answer them. `Supported` is false when the driver cannot interrogate its transmit path, and only `TxPowerDBm` is populated then; every other field stays nil. `ConfigVerified` false means config writes are not landing, which caps output well below the commanded level, and a present false there is a fault report, which is exactly why an absent field must not decode to false. `Detail` carries the chip-specific raw values as human-readable text: render it, never parse it, since the format is the driver's to choose and may change with the part.
 - The GNSS feed counters (`GPSRxBytes`, `GPSRxLines`, `GPSChip`, `GPSRxOverruns`, `GPSRxErrors`, `GPSRxDisabled`, `GPSRxRearmFail`): present only on boards with GPS capability. A present `GPSRxBytes` of 0 with the driver running means the UART link is dead, whereas a nil `GPSRxBytes` means the board has no GPS to report on.
 
-`TrafficEvent` carries no origin address. The firmware's traffic ring records eight fields per event (`seq`, `timestamp_ms`, `pkt_type`, `category`, `airtime_tier`, `packet_len`, `rssi`, `is_tx`) and no sender, so per-peer signal strength cannot be derived from traffic events today; `Neighbors(ctx)` remains the source for per-peer RSSI.
+`TrafficEvent.SrcAddr` is the claimed origin address of an RX frame, as 8 uppercase hex digits. It is empty when the frame's packet type carries no origin address and on every TX event: the firmware records an unknown origin as zero and omits the key rather than sending it, so a present value is always 8 hex digits and `""` unambiguously means "no origin". Compare against `""` to detect absence. The address is read from the unauthenticated wire prefix, so it is telemetry, not a verified identity; pairing it with `RSSI` is what makes per-peer signal strength measurable, since neighbour RSSI only refreshes on beacons.
 
 ```go
 diag, _ := client.Diagnostics(ctx, false)
