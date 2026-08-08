@@ -410,7 +410,7 @@ func TestClient_OnLocationEvent(t *testing.T) {
 		if evt.Event != "received" || evt.Peer != "AABBCCDD" {
 			t.Fatalf("unexpected location event: %+v", evt)
 		}
-		// Firmware sends tier as integer 1 — SDK should decode to "coarse".
+		// Firmware sends tier as integer 1, so the SDK should decode to "coarse".
 		if evt.Tier != LocationTierCoarse {
 			t.Fatalf("expected tier=%q, got %q", LocationTierCoarse, evt.Tier)
 		}

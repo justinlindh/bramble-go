@@ -178,7 +178,7 @@ func (s *Serial) reader() {
 			default:
 			}
 			if err != nil {
-				// Fatal read error (USB disconnect, etc.) — attempt reconnect.
+				// Fatal read error (USB disconnect, etc.): attempt reconnect.
 				if rerr := s.reconnect(); rerr != nil {
 					select {
 					case s.errCh <- fmt.Errorf("bramble/transport/serial: reconnect failed: %w", rerr):
@@ -186,10 +186,10 @@ func (s *Serial) reader() {
 					}
 					return
 				}
-				// Reconnected — continue reading with new scanner.
+				// Reconnected: continue reading with new scanner.
 				continue
 			}
-			// If Scan returned false with no error it may be a timeout — retry.
+			// If Scan returned false with no error it may be a timeout, so retry.
 			s.scanner = bufio.NewScanner(s.conn)
 			continue
 		}

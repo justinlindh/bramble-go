@@ -135,7 +135,7 @@ func TestNewBLEDefaultScanTimeout(t *testing.T) {
 
 func TestBLECloseIdempotent(t *testing.T) {
 	b := NewBLE("")
-	// Not connected — Close should be no-op
+	// Not connected: Close should be no-op
 	if err := b.Close(); err != nil {
 		t.Fatalf("close when not connected: %v", err)
 	}
