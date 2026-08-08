@@ -158,6 +158,12 @@ type flakyReconnectTransport struct {
 	mu    sync.Mutex
 	sends int
 	recv  chan []byte
+	// reply is delivered by the send that carries the request, rather than
+	// being queued up front. The reader goroutine drops any response whose id
+	// is not in the pending map yet (see Protocol.reader), so a reply queued
+	// before Call registers its id can be consumed and discarded, after which
+	// Call has nothing left to wake it and blocks until its context expires.
+	reply []byte
 }
 
 func (f *flakyReconnectTransport) Connect(context.Context) error { return nil }
@@ -173,6 +179,13 @@ func (f *flakyReconnectTransport) Send(_ context.Context, _ []byte) error {
 	if f.sends == 1 {
 		return transport.ErrReconnecting
 	}
+	// Call registers its pending id before it ever calls Send, so releasing
+	// the reply here cannot race the reader: by the time this can run, the id
+	// the reply names is already in the pending map.
+	if f.reply != nil {
+		f.recv <- f.reply
+		f.reply = nil
+	}
 	return nil
 }
 
@@ -186,12 +199,13 @@ func (f *flakyReconnectTransport) Receive(ctx context.Context) ([]byte, error) {
 }
 
 func TestProtocol_CallRetriesWhileTransportReconnecting(t *testing.T) {
-	tpt := &flakyReconnectTransport{recv: make(chan []byte, 1)}
+	tpt := &flakyReconnectTransport{
+		recv:  make(chan []byte, 1),
+		reply: []byte(`{"jsonrpc":"2.0","id":1,"result":{"ok":true}}`),
+	}
 	p := NewProtocol(tpt)
 	p.Start()
 	defer p.Stop()
-
-	tpt.recv <- []byte(`{"jsonrpc":"2.0","id":1,"result":{"ok":true}}`)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()

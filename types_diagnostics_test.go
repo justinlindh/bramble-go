@@ -342,9 +342,10 @@ func TestDiagnosticsResponseOmitsAbsentOptionalFields(t *testing.T) {
 }
 
 // TestTrafficEventSrcAddr covers the origin address, which the firmware sends
-// only for RX frames whose packet type actually carries one. A consumer
-// plotting per-peer signal strength has to be able to tell "no origin" from a
-// real address, and "00000000" is a real address.
+// only for RX frames whose packet type actually carries one: it records an
+// unknown origin as zero and omits the key rather than sending it (see
+// traffic_event_add_json in main/util.c). A consumer plotting per-peer signal
+// strength has to be able to tell "no origin" from a real address.
 func TestTrafficEventSrcAddr(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -369,7 +370,12 @@ func TestTrafficEventSrcAddr(t *testing.T) {
 			wantIsTx:    true,
 		},
 		{
-			name:        "all-zero address is a real address, not an absence",
+			// Defensive: current firmware never emits this, because it treats a
+			// zero origin as unknown and omits the key. Decoding it as a value
+			// rather than as an absence is still the correct behaviour, since
+			// the schema's pattern admits it and the SDK must not invent a
+			// sentinel the wire does not define.
+			name:        "all-zero address decodes as a value, not an absence",
 			payload:     `{"seq":14,"timestamp_ms":9300,"pkt_type":3,"category":"chat","airtime_tier":"normal","packet_len":48,"rssi":-65,"is_tx":false,"src_addr":"00000000"}`,
 			wantSrcAddr: "00000000",
 		},
