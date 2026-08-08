@@ -238,10 +238,10 @@ func TestIsTransientBLEWriteError(t *testing.T) {
 func TestRetrySend_SucceedsFirstTry(t *testing.T) {
 	calls := 0
 	sleeps := 0
-	err := retrySend(func() error {
+	err := retrySend(context.Background(), func() error {
 		calls++
 		return nil
-	}, func(time.Duration) { sleeps++ }, 5, time.Millisecond)
+	}, func(context.Context, time.Duration) error { sleeps++; return nil }, 5, time.Millisecond)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -256,13 +256,13 @@ func TestRetrySend_SucceedsFirstTry(t *testing.T) {
 func TestRetrySend_RetriesTransientThenSucceeds(t *testing.T) {
 	calls := 0
 	sleeps := 0
-	err := retrySend(func() error {
+	err := retrySend(context.Background(), func() error {
 		calls++
 		if calls < 3 {
 			return errors.New("org.bluez.Error.InProgress: In Progress")
 		}
 		return nil
-	}, func(time.Duration) { sleeps++ }, 5, time.Millisecond)
+	}, func(context.Context, time.Duration) error { sleeps++; return nil }, 5, time.Millisecond)
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -278,10 +278,10 @@ func TestRetrySend_StopsImmediatelyOnNonTransientError(t *testing.T) {
 	calls := 0
 	sleeps := 0
 	wantErr := errors.New("permanent failure")
-	err := retrySend(func() error {
+	err := retrySend(context.Background(), func() error {
 		calls++
 		return wantErr
-	}, func(time.Duration) { sleeps++ }, 5, time.Millisecond)
+	}, func(context.Context, time.Duration) error { sleeps++; return nil }, 5, time.Millisecond)
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected wantErr, got %v", err)
 	}
@@ -296,10 +296,10 @@ func TestRetrySend_StopsImmediatelyOnNonTransientError(t *testing.T) {
 func TestRetrySend_GivesUpAfterMaxAttempts(t *testing.T) {
 	calls := 0
 	sleeps := 0
-	err := retrySend(func() error {
+	err := retrySend(context.Background(), func() error {
 		calls++
 		return errors.New("in progress")
-	}, func(time.Duration) { sleeps++ }, 5, time.Millisecond)
+	}, func(context.Context, time.Duration) error { sleeps++; return nil }, 5, time.Millisecond)
 	if err == nil {
 		t.Fatal("expected error after exhausting retries")
 	}
@@ -308,6 +308,74 @@ func TestRetrySend_GivesUpAfterMaxAttempts(t *testing.T) {
 	}
 	if sleeps != 4 {
 		t.Fatalf("expected 4 sleeps between 5 calls, got %d", sleeps)
+	}
+}
+
+// A caller that cancels mid-retry should not have to sit through the
+// remaining backoff. The waiter reports the cancellation and retrySend stops
+// there, surfacing ctx.Err() rather than the transient write error, since the
+// cancellation is why it stopped trying.
+func TestRetrySend_StopsOnContextCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	calls := 0
+	err := retrySend(ctx, func() error {
+		calls++
+		return errors.New("in progress")
+	}, func(c context.Context, _ time.Duration) error {
+		cancel()
+		return c.Err()
+	}, 5, time.Millisecond)
+
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected retrying to stop after 1 call, got %d", calls)
+	}
+}
+
+func TestBleWaitReturnsOnCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	// A delay far longer than the test could tolerate: if bleWait ignored the
+	// context this would hang rather than fail.
+	start := time.Now()
+	if err := bleWait(ctx, time.Hour); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context.Canceled, got %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Fatalf("bleWait slept %v despite a cancelled context", elapsed)
+	}
+}
+
+func TestBleWaitReturnsNilWhenDelayElapses(t *testing.T) {
+	if err := bleWait(context.Background(), time.Millisecond); err != nil {
+		t.Fatalf("expected nil after the delay elapsed, got %v", err)
+	}
+}
+
+// Retrying is only safe while the payload fits one write. Send splits at
+// bleChunkSize and issues a write per chunk, so a half-applied multi-chunk
+// send must not be repeated.
+func TestBleAuthAttemptsOnlyRetriesSingleChunkTokens(t *testing.T) {
+	// The newline Send appends counts toward the chunk, so a token of exactly
+	// bleChunkSize already spans two chunks.
+	cases := []struct {
+		name  string
+		token string
+		want  int
+	}{
+		{"short token retries", "secret-token", bleAuthWriteRetries},
+		{"one byte under the chunk retries", strings.Repeat("a", bleChunkSize-1), bleAuthWriteRetries},
+		{"exactly the chunk does not retry", strings.Repeat("a", bleChunkSize), 1},
+		{"over the chunk does not retry", strings.Repeat("a", bleChunkSize+1), 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := bleAuthAttempts(tc.token); got != tc.want {
+				t.Fatalf("bleAuthAttempts(len %d) = %d, want %d", len(tc.token), got, tc.want)
+			}
+		})
 	}
 }
 

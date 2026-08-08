@@ -33,6 +33,27 @@ const bleAuthAckTimeout = 5 * time.Second
 // an empty result even though the service is present.
 const bleDiscoveryRetryDelay = time.Second
 
+// bleChunkSize is the write size Send splits payloads into, sized for a
+// common ATT payload limit (default MTU 247 leaves ~240 bytes after protocol
+// overhead).
+const bleChunkSize = 240
+
+// bleWait blocks for delay, or until ctx is cancelled, whichever comes first,
+// returning ctx.Err() in the latter case. Connect's retry delays go through
+// this rather than a bare sleep so that cancelling the context actually
+// interrupts a connect in progress instead of being noticed only once every
+// delay has run to completion.
+func bleWait(ctx context.Context, delay time.Duration) error {
+	t := time.NewTimer(delay)
+	defer t.Stop()
+	select {
+	case <-t.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 // NUS (Nordic UART Service) UUIDs, must match firmware ble_server.c.
 //
 // bluetooth.NewUUID takes its [16]byte argument in big-endian (string)
@@ -204,7 +225,10 @@ func (b *BLE) connect(ctx context.Context) error {
 		// A fresh bluez GATT cache can race a filtered DiscoverServices call
 		// immediately after connect, returning an empty result even though
 		// the service is present. Retry once before giving up.
-		bleSleep(bleDiscoveryRetryDelay)
+		if werr := bleWait(ctx, bleDiscoveryRetryDelay); werr != nil {
+			_ = device.Disconnect()
+			return werr
+		}
 		svcs, err = device.DiscoverServices([]bluetooth.UUID{nusServiceUUID})
 	}
 	if err != nil || len(svcs) == 0 {
@@ -265,9 +289,12 @@ func (b *BLE) authenticate(ctx context.Context) error {
 	}
 
 	token := b.authToken
-	err := retrySend(func() error {
+
+	attempts := bleAuthAttempts(token)
+
+	err := retrySend(ctx, func() error {
 		return b.Send(ctx, []byte(token))
-	}, bleSleep, bleAuthWriteRetries, bleAuthWriteRetryDelay)
+	}, bleWait, attempts, bleAuthWriteRetryDelay)
 	if err != nil {
 		return fmt.Errorf("bramble/transport/ble: auth write: %w", err)
 	}
@@ -285,11 +312,32 @@ func (b *BLE) authenticate(ctx context.Context) error {
 	return nil
 }
 
-// retrySend calls send, retrying up to attempts times (sleeping delay
-// between attempts) as long as the returned error looks like a transient
-// bluez write failure. It returns immediately on success or on a
-// non-transient error.
-func retrySend(send func() error, sleep func(time.Duration), attempts int, delay time.Duration) error {
+// bleAuthAttempts reports how many times the auth token write may be tried.
+//
+// Send issues one write per bleChunkSize chunk, so retrying a payload that
+// spans more than one chunk would re-send chunks that already landed and
+// corrupt the newline-delimited framing on the device. A token that fits in a
+// single chunk (counting the newline Send appends) has no such split to
+// half-apply and is safe to repeat; anything larger gets one attempt.
+func bleAuthAttempts(token string) int {
+	if len(token)+1 > bleChunkSize {
+		return 1
+	}
+	return bleAuthWriteRetries
+}
+
+// retrySend calls send, retrying up to attempts times (waiting delay between
+// attempts) as long as the returned error looks like a transient bluez write
+// failure. It returns immediately on success or on a non-transient error.
+//
+// send must be safe to repeat: a partially applied send cannot be retried
+// without corrupting device-side framing, so callers whose payload spans more
+// than one write are responsible for passing attempts=1 (see authenticate).
+//
+// The wait is cancellable so that a caller abandoning the connect does not
+// have to sit through the remaining backoff; ctx.Err() is returned in that
+// case, since the cancellation is the reason the retry stopped.
+func retrySend(ctx context.Context, send func() error, wait func(context.Context, time.Duration) error, attempts int, delay time.Duration) error {
 	var err error
 	for i := 0; i < attempts; i++ {
 		err = send()
@@ -297,7 +345,9 @@ func retrySend(send func() error, sleep func(time.Duration), attempts int, delay
 			return err
 		}
 		if i < attempts-1 {
-			sleep(delay)
+			if werr := wait(ctx, delay); werr != nil {
+				return werr
+			}
 		}
 	}
 	return err
@@ -451,7 +501,7 @@ func (b *BLE) Send(_ context.Context, data []byte) error {
 
 	// Write in chunks sized for a common ATT payload limit.
 	// With default MTU 247, payload is typically 240 bytes after protocol overhead.
-	const chunkSize = 240
+	const chunkSize = bleChunkSize
 	for i := 0; i < len(payload); i += chunkSize {
 		end := i + chunkSize
 		if end > len(payload) {
