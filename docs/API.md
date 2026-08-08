@@ -11,6 +11,7 @@ Full method and callback reference for `bramble-go`.
   - [Action and Debug Usage Examples](#action-and-debug-usage-examples)
 - [Notification Callbacks](#notification-callbacks)
 - [Key Types](#key-types)
+  - [Optional Fields](#optional-fields)
 - [Action Messages (`/me`)](#action-messages-me)
 - [BLE Transport Details](#ble-transport-details)
 
@@ -24,7 +25,7 @@ All methods accept a `context.Context` for timeout/cancellation.
 |--------|---------|-------------|
 | `Status(ctx)` | `*StatusResponse` | Address, firmware, peers, counters, uptime |
 | `WifiStatus(ctx)` | `*WifiStatus` | Wi-Fi mode/link/AP client status |
-| `Diagnostics(ctx, includeHeapDump)` | `*DiagnosticsResponse` | Runtime heap and task stack diagnostics |
+| `Diagnostics(ctx, includeHeapDump)` | `*DiagnosticsResponse` | Runtime heap, task stack, airtime backpressure, radio health, and GNSS feed diagnostics |
 | `Identity(ctx)` | `*IdentityResponse` | Address + public key hash |
 | `Version(ctx)` | `*VersionResponse` | Firmware/protocol version, hardware |
 | `DeliveryEvents(ctx, sinceEventSeq, limit)` | `*DeliveryReplayResponse` | Replay persisted delivery telemetry events |
@@ -214,6 +215,9 @@ client.OnProbeResult(func(p bramble.ProbeResult) {
 
 client.OnTrafficEvent(func(e bramble.TrafficEvent) {
     fmt.Printf("Traffic seq=%d tx=%t len=%d category=%s\n", e.Seq, e.IsTx, e.PacketLen, e.Category)
+    if e.SrcAddr != "" {
+        fmt.Printf("  from %s at %d dBm\n", e.SrcAddr, e.RSSI)
+    }
 })
 
 client.OnDecodeError(func(method string, err error, payload []byte) {
@@ -225,7 +229,43 @@ client.OnDecodeError(func(method string, err error, payload []byte) {
 
 The canonical type definitions live in [`types.go`](../types.go) and are kept in sync with firmware wire fields.
 
-Notably, `StatusResponse` and `ConfigResponse` include additional fields beyond older snippets (for example `SupportsDeliveryEventSync` and `Location`) — refer to source for the current schema.
+Notably, `StatusResponse` and `ConfigResponse` include additional fields beyond older snippets (for example `SupportsDeliveryEventSync` and `Location`): refer to source for the current schema.
+
+### Optional Fields
+
+Some wire fields are optional: firmware omits them when the build has no such subsystem, and older firmware omits them entirely. Those fields are pointers, so an absent field stays distinguishable from a genuine zero reading. That distinction is the diagnostic value, so test for `nil` before dereferencing.
+
+`DiagnosticsResponse` carries three optional groups:
+
+- `Backpressure` (`*DiagnosticsBackpressure`): airtime backpressure counters. Non-zero values mean the node shed load rather than transmitting, which separates "we deliberately yielded the channel" from "the radio is broken". Its nested `ProbeIngress` holds the node-global inbound PROBE token-bucket accounting.
+- `RadioHealth` (`*DiagnosticsRadioHealth`): what the radio reports about its own transmit path, as generic verdicts (`PAFault`, `PLLFault`, `OscillatorFault`, `CalibrationFault`, `ConfigVerified`) rather than one part's register layout, so they stay meaningful as other radios learn to answer them. `Supported` is false when the driver cannot interrogate its transmit path, and only `TxPowerDBm` is populated then; every other field stays nil. `ConfigVerified` false means config writes are not landing, which caps output well below the commanded level, and a present false there is a fault report, which is exactly why an absent field must not decode to false. `Detail` carries the chip-specific raw values as human-readable text: render it, never parse it, since the format is the driver's to choose and may change with the part.
+- The GNSS feed counters (`GPSRxBytes`, `GPSRxLines`, `GPSChip`, `GPSRxOverruns`, `GPSRxErrors`, `GPSRxDisabled`, `GPSRxRearmFail`): present only on boards with GPS capability. A present `GPSRxBytes` of 0 with the driver running means the UART link is dead, whereas a nil `GPSRxBytes` means the board has no GPS to report on.
+
+`TrafficEvent.SrcAddr` is the claimed origin address of an RX frame, as 8 uppercase hex digits. It is empty when the frame's packet type carries no origin address and on every TX event. The wire form can never be empty and an all-zero address is a real value rather than a sentinel, so compare against `""` to detect absence. The address is read from the unauthenticated wire prefix, so it is telemetry, not a verified identity; pairing it with `RSSI` is what makes per-peer signal strength measurable, since neighbour RSSI only refreshes on beacons.
+
+```go
+diag, _ := client.Diagnostics(ctx, false)
+
+if diag.RadioHealth != nil && diag.RadioHealth.Supported {
+    if diag.RadioHealth.ConfigVerified != nil && !*diag.RadioHealth.ConfigVerified {
+        fmt.Println("configuration writes are not landing on the chip")
+    }
+    if diag.RadioHealth.PAFault != nil && *diag.RadioHealth.PAFault {
+        fmt.Println("the PA did not ramp, so nothing usable went on air")
+    }
+    if diag.RadioHealth.Detail != nil {
+        fmt.Println(*diag.RadioHealth.Detail) // display only, do not parse
+    }
+}
+
+if diag.GPSRxBytes != nil && *diag.GPSRxBytes == 0 {
+    fmt.Println("GNSS driver is running but no bytes have arrived")
+}
+
+if diag.Backpressure != nil && diag.Backpressure.FloodRelayDrops > 0 {
+    fmt.Printf("shed %v flood relays\n", diag.Backpressure.FloodRelayDrops)
+}
+```
 
 ## Action Messages (`/me`)
 
