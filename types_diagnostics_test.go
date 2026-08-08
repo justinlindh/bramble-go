@@ -340,3 +340,75 @@ func TestDiagnosticsResponseOmitsAbsentOptionalFields(t *testing.T) {
 		}
 	}
 }
+
+// TestTrafficEventSrcAddr covers the origin address, which the firmware sends
+// only for RX frames whose packet type actually carries one: it records an
+// unknown origin as zero and omits the key rather than sending it (see
+// traffic_event_add_json in main/util.c). A consumer plotting per-peer signal
+// strength has to be able to tell "no origin" from a real address.
+func TestTrafficEventSrcAddr(t *testing.T) {
+	tests := []struct {
+		name        string
+		payload     string
+		wantSrcAddr string
+		wantIsTx    bool
+	}{
+		{
+			name:        "rx event with origin address",
+			payload:     `{"seq":11,"timestamp_ms":9000,"pkt_type":3,"category":"chat","airtime_tier":"normal","packet_len":48,"rssi":-72,"is_tx":false,"src_addr":"A1B2C3D4"}`,
+			wantSrcAddr: "A1B2C3D4",
+		},
+		{
+			name:        "rx event whose packet type carries no origin",
+			payload:     `{"seq":12,"timestamp_ms":9100,"pkt_type":9,"category":"maintenance","airtime_tier":"none","packet_len":16,"rssi":-90,"is_tx":false}`,
+			wantSrcAddr: "",
+		},
+		{
+			name:        "tx event never carries an origin",
+			payload:     `{"seq":13,"timestamp_ms":9200,"pkt_type":3,"category":"chat","airtime_tier":"normal","packet_len":48,"rssi":0,"is_tx":true}`,
+			wantSrcAddr: "",
+			wantIsTx:    true,
+		},
+		{
+			// Defensive: current firmware never emits this, because it treats a
+			// zero origin as unknown and omits the key. Decoding it as a value
+			// rather than as an absence is still the correct behaviour, since
+			// the schema's pattern admits it and the SDK must not invent a
+			// sentinel the wire does not define.
+			name:        "all-zero address decodes as a value, not an absence",
+			payload:     `{"seq":14,"timestamp_ms":9300,"pkt_type":3,"category":"chat","airtime_tier":"normal","packet_len":48,"rssi":-65,"is_tx":false,"src_addr":"00000000"}`,
+			wantSrcAddr: "00000000",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var e TrafficEvent
+			if err := json.Unmarshal([]byte(tt.payload), &e); err != nil {
+				t.Fatalf("unmarshal: %v", err)
+			}
+			if e.SrcAddr != tt.wantSrcAddr {
+				t.Fatalf("SrcAddr = %q, want %q", e.SrcAddr, tt.wantSrcAddr)
+			}
+			if e.IsTx != tt.wantIsTx {
+				t.Fatalf("IsTx = %t, want %t", e.IsTx, tt.wantIsTx)
+			}
+
+			// The wire form is 8 hex digits and can never be empty, so an
+			// empty SrcAddr survives a re-serialize as an absent key rather
+			// than as an address-shaped zero value.
+			out, err := json.Marshal(e)
+			if err != nil {
+				t.Fatalf("marshal: %v", err)
+			}
+			var keys map[string]json.RawMessage
+			if err := json.Unmarshal(out, &keys); err != nil {
+				t.Fatalf("unmarshal marshalled output: %v", err)
+			}
+			_, present := keys["src_addr"]
+			if present != (tt.wantSrcAddr != "") {
+				t.Fatalf("src_addr present = %t, want %t; got %s", present, tt.wantSrcAddr != "", out)
+			}
+		})
+	}
+}

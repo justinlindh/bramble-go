@@ -832,6 +832,17 @@ type TrafficEvent struct {
 	PacketLen   int    `json:"packet_len"`
 	RSSI        int    `json:"rssi"` // 0 for TX events
 	IsTx        bool   `json:"is_tx"`
+
+	// SrcAddr is the claimed origin address of an RX frame, as 8 uppercase hex
+	// digits. It is empty when the frame's packet type carries no origin
+	// address and on every TX event: the firmware records an unknown origin as
+	// zero and omits the key entirely rather than sending it, so a present
+	// value always matches ^[0-9A-F]{8}$ and empty is unambiguously "no
+	// origin". Read from the unauthenticated wire prefix, so it is telemetry,
+	// not a verified identity. Pairing it with RSSI is what makes per-peer
+	// signal strength measurable, since neighbour RSSI only refreshes on
+	// beacons.
+	SrcAddr string `json:"src_addr,omitempty"`
 }
 
 // ActionPrefix and ActionSuffix are the CTCP ACTION delimiters used for /me messages.
