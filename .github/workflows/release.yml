@@ -36,6 +36,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
+          # main's tip, not the triggering SHA. semantic-release refuses to
+          # publish when the checked-out branch is behind its remote, and the
+          # default checkout pins this job to the merge commit that triggered
+          # it. So when a second merge lands while this run is starting, the
+          # run reports success and publishes nothing, leaving the work
+          # unreleased with no failure anywhere to notice. Pinning to main
+          # makes every run self-sufficient: it releases whatever is
+          # unreleased when it starts, rather than depending on some later
+          # run to sweep up the commits it skipped. The release config only
+          # ever releases main, so a manual dispatch wants main's tip too.
+          ref: main
           fetch-depth: 0
 
       - name: Setup Node.js
