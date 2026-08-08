@@ -180,6 +180,25 @@ type IdentityResponse struct {
 	Ed25519Pub string `json:"ed25519_pub,omitempty"`
 }
 
+// NetworkKeyStatusResponse is returned by bramble.getNetworkKeyStatus.
+// Provisioned false means the node holds no network key and is INERT: it is not
+// meshing and will not participate in the authenticated control plane.
+// Fingerprint is SHA256(key)[0:4] as 8 lowercase hex, and reads as the all-zero
+// sentinel "00000000" while unprovisioned. The key itself is never returned.
+type NetworkKeyStatusResponse struct {
+	Provisioned bool   `json:"provisioned"`
+	Fingerprint string `json:"fingerprint"`
+}
+
+// GenerateNetworkKeyResponse is returned by bramble.generateNetworkKey. Key is
+// the freshly minted 32-byte network key as 64 lowercase hex, returned exactly
+// once: the node is already provisioned with it and will never read it back.
+// Treat it as the secret it is, record it out of band, and never log it.
+type GenerateNetworkKeyResponse struct {
+	Key         string `json:"key"`
+	Fingerprint string `json:"fingerprint"`
+}
+
 // AnchorStatusResponse is returned by bramble.getAnchorStatus. Anchored
 // reports whether a fleet anchor public key is provisioned on the node;
 // Endorsed reports whether the node holds a cert that verifies against the

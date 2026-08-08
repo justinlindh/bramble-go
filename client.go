@@ -361,6 +361,61 @@ func (c *Client) Identity(ctx context.Context) (*IdentityResponse, error) {
 	return &resp, nil
 }
 
+// SetNetworkKey provisions the fleet control-plane network key (64 hex chars)
+// on the node, joining it to the network that key defines. This is what takes a
+// node from INERT to meshing: until it is set the node neither emits nor
+// accepts authenticated control-plane traffic. It takes effect live (the beacon
+// HMAC key is re-derived without a reboot). Setting a different key on an
+// already-provisioned node RE-KEYS it and cuts it off from every node still on
+// the old key, so confirm before calling it on a live fleet member.
+//
+// The key is write-only at the device boundary: it can never be read back.
+// Callers must record it out of band before relying on it.
+func (c *Client) SetNetworkKey(ctx context.Context, keyHex string) error {
+	raw, err := c.proto.Call(ctx, "bramble.setNetworkKey", map[string]string{"key": keyHex})
+	if err != nil {
+		return err
+	}
+	return checkOK(raw, "setNetworkKey")
+}
+
+// NetworkKeyStatus reports whether the node holds a network key and, when it
+// does, the one-way fingerprint of that key. Nodes reporting the same
+// fingerprint are on the same network; a node reporting Provisioned false is
+// inert and is not meshing. The key itself is never returned.
+func (c *Client) NetworkKeyStatus(ctx context.Context) (*NetworkKeyStatusResponse, error) {
+	raw, err := c.proto.Call(ctx, "bramble.getNetworkKeyStatus", nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp NetworkKeyStatusResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode NetworkKeyStatusResponse: %w", err)
+	}
+	return &resp, nil
+}
+
+// GenerateNetworkKey mints a fresh entropy-gated network key ON THE NODE,
+// provisions this node with it atomically, and returns the raw key once so the
+// operator can carry it to every other node. This node becomes the fleet
+// founder. On an already-provisioned node this RE-KEYS it: confirm first.
+//
+// The returned key is the only copy that will ever exist: the node will not
+// read it back. Record it out of band immediately, and never log it. On
+// entropy failure the node provisions nothing and the call returns an error,
+// leaving the previous provisioning state untouched.
+func (c *Client) GenerateNetworkKey(ctx context.Context) (*GenerateNetworkKeyResponse, error) {
+	raw, err := c.proto.Call(ctx, "bramble.generateNetworkKey", nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp GenerateNetworkKeyResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode GenerateNetworkKeyResponse: %w", err)
+	}
+	return &resp, nil
+}
+
 // SetAnchor provisions the fleet anchor public key (64 hex chars) on the
 // node. Only anchor-endorsed identities pin on an anchored node; a node with
 // no anchor keeps TOFU behavior. The anchor PUBLIC key only: the anchor
