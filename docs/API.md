@@ -43,6 +43,7 @@ All methods accept a `context.Context` for timeout/cancellation.
 | `AudioStatus(ctx)` | `*AudioStatus` | Audio availability, volume, mute, and playback state |
 | `StorageInfo(ctx)` | `*StorageInfo` | Board storage status (SD card presence and mount point) |
 | `AuthToken(ctx)` | `(string, error)` | Retrieve the device's WebSocket auth token (typically over serial) |
+| `BleSecurity(ctx)` | `*BleSecurity` | BLE pairing mode and whether a static passkey is stored (the passkey itself is never returned) |
 
 ### Query Usage Examples
 
@@ -102,6 +103,7 @@ fmt.Println("auth token:", token)
 | `SetTrafficDebug(ctx, params)` | `*SetTrafficDebugResponse` | Configure traffic debug telemetry capture |
 | `SetBeaconPolicy(ctx, params)` | `error` | Update adaptive beaconing policy settings |
 | `SetAuthToken(ctx, token)` | `error` | Set or clear the device's WebSocket auth token |
+| `SetBlePasskey(ctx, passkey)` | `*SetBlePasskeyResponse` | Set the 6-digit static BLE pairing passkey, or clear it with an empty string; wipes all BLE bonds |
 | `SetBroadcastTelemetryMode(ctx, mode)` | `*SetBroadcastTelemetryModeResponse` | Update broadcast telemetry mode |
 | `SetBacklight(ctx, level)` | `*BacklightResponse` | Set display backlight level (0–255) |
 | `Sleep(ctx, wakeAfterS)` | `*SleepResponse` | Enter deep sleep; wake after `wakeAfterS` seconds (0 = no timer) |
@@ -156,6 +158,22 @@ bl, _ := client.SetBacklight(ctx, 128)
 fmt.Println("backlight level:", bl.Level)
 sr, _ := client.Sleep(ctx, 300) // wake after 5 min
 fmt.Println("sleep scheduled:", sr.OK)
+
+// BLE pairing security: read the posture, then set a static passkey on a
+// node without a display. A refusal arrives as ok:false in a successful
+// call, so check resp.OK rather than only the error.
+sec, _ := client.BleSecurity(ctx)
+fmt.Printf("ble mode=%s static passkey set=%v\n", sec.Mode, sec.StaticPasskeySet)
+if sec.Mode != bramble.BleSecurityModePasskeyDisplay {
+    pk, err := client.SetBlePasskey(ctx, "314159") // "" clears it
+    if err != nil {
+        log.Fatalf("setBlePasskey call failed: %v", err)
+    }
+    if !pk.OK {
+        log.Fatalf("node refused the passkey: %s", pk.Error)
+    }
+    fmt.Println("ble mode now:", pk.Mode) // all existing bonds were wiped
+}
 
 // Audio controls
 _ = client.PlayTone(ctx, "startup")
@@ -247,6 +265,7 @@ Practical notes:
 - If a device name is given, scan matching uses case-insensitive substring matching.
 - If the device name is empty, the transport scans for the first device advertising the Bramble NUS service.
 - Pairing/bonding behavior is OS-level; complete pairing first if your platform requires it.
+- The code the host asks for depends on the node's pairing mode, which `BleSecurity(ctx)` reports. A node with a display shows a random 6-digit code on its own screen for each attempt. A node without one uses the static passkey set through `SetBlePasskey(ctx, passkey)`, or pairs with no code at all (`just-works`) while none is set. Setting, changing, or clearing the passkey wipes the node's bonds, so every paired host pairs again.
 - BLE throughput/latency is lower than serial/WebSocket; set realistic RPC deadlines.
 
 Minimal BLE connect example:
