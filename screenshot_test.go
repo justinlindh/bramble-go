@@ -224,6 +224,54 @@ func TestAssembleScreenshotRejectsEmptyFrame(t *testing.T) {
 	}
 }
 
+// Total drives the pre-allocation, so it has to be rejected before it is
+// trusted: an endpoint reached through Client.Call is not necessarily real
+// firmware, and a huge claimed total would otherwise be allocated outright.
+// The fetch fails the test if it is called a second time, since rejecting the
+// frame means never paging it.
+func TestAssembleScreenshotRejectsImplausibleFrameSize(t *testing.T) {
+	calls := 0
+	fetch := func(_ context.Context, _ map[string]any) (*ScreenshotChunk, error) {
+		calls++
+		if calls > 1 {
+			t.Fatal("kept paging a frame whose size was already rejected")
+		}
+		return &ScreenshotChunk{Width: 4096, Height: 4096, Total: maxScreenshotBytes + 1}, nil
+	}
+
+	_, err := assembleScreenshot(context.Background(), fetch)
+	if err == nil || !strings.Contains(err.Error(), "implausible frame size") {
+		t.Fatalf("error was %v, want an implausible frame size rejection", err)
+	}
+}
+
+// The bound is a ceiling, not a limit on ordinary frames: a frame exactly at
+// the cap still assembles.
+func TestAssembleScreenshotAcceptsFrameExactlyAtTheCap(t *testing.T) {
+	fetch := func(_ context.Context, params map[string]any) (*ScreenshotChunk, error) {
+		offset := 0
+		if v, ok := params["offset"].(int); ok {
+			offset = v
+		}
+		remaining := maxScreenshotBytes - offset
+		return &ScreenshotChunk{
+			Width: 4096, Height: 4096, Format: "rgb565",
+			Total:  maxScreenshotBytes,
+			Offset: offset,
+			Len:    remaining,
+			Data:   base64.StdEncoding.EncodeToString(make([]byte, remaining)),
+		}, nil
+	}
+
+	shot, err := assembleScreenshot(context.Background(), fetch)
+	if err != nil {
+		t.Fatalf("a frame exactly at the cap was rejected: %v", err)
+	}
+	if len(shot.Pixels) != maxScreenshotBytes {
+		t.Fatalf("assembled %d bytes, want %d", len(shot.Pixels), maxScreenshotBytes)
+	}
+}
+
 func TestAssembleScreenshotRejectsMalformedBase64(t *testing.T) {
 	fetch := func(_ context.Context, _ map[string]any) (*ScreenshotChunk, error) {
 		return &ScreenshotChunk{Total: 100, Offset: 0, Data: "!!!not base64!!!"}, nil

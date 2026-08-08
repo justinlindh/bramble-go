@@ -7,6 +7,11 @@ import (
 	"fmt"
 )
 
+// maxScreenshotBytes bounds the frame size a device may claim. 32 MiB is
+// 4096x4096 at two bytes per pixel, orders of magnitude past the panels this
+// firmware drives, so it constrains only a far end that is lying or broken.
+const maxScreenshotBytes = 32 << 20
+
 // ScreenshotChunk is one response from bramble.screenshot.
 //
 // The framebuffer does not fit in a single RPC response, so the firmware
@@ -80,6 +85,17 @@ func assembleScreenshot(ctx context.Context, fetch screenshotFetch) (*Screenshot
 	}
 	if first.Total <= 0 {
 		return nil, fmt.Errorf("bramble: screenshot: device reported an empty frame (total=%d)", first.Total)
+	}
+	// Total sizes the pre-allocation below, and it is a number the far end
+	// chose. Against real firmware that is fine, but Client.Call deliberately
+	// opens this path to arbitrary endpoints, and a bogus total would other-
+	// wise turn a single reply into an allocation big enough to take the
+	// process down before any chunk has been checked. The cap sits far above
+	// any panel this firmware drives, so it rejects only frames that were
+	// never plausible in the first place.
+	if first.Total > maxScreenshotBytes {
+		return nil, fmt.Errorf("bramble: screenshot: device reported an implausible frame size (total=%d, max %d)",
+			first.Total, maxScreenshotBytes)
 	}
 
 	shot := &Screenshot{
