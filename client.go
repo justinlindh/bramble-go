@@ -1021,6 +1021,43 @@ func (c *Client) Config(ctx context.Context) (*ConfigResponse, error) {
 	return &resp, nil
 }
 
+// DmSessions returns the node's DM session table.
+//
+// A directed send (a chat DM, or a per-contact location share) requires an
+// active session with the destination and is dropped without one, so this is
+// what tells a caller which configured peer a node currently cannot send to.
+// The response carries no key material.
+func (c *Client) DmSessions(ctx context.Context) (*DmSessionsResponse, error) {
+	raw, err := c.proto.Call(ctx, "bramble.getDmSessions", nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp DmSessionsResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode DmSessionsResponse: %w", err)
+	}
+	return &resp, nil
+}
+
+// ── Raw RPC ───────────────────────────────────────────────────────────────────
+
+// Call invokes an RPC method by name and returns its raw JSON result.
+//
+// Every typed method on Client is a thin wrapper over this. It is exported so a
+// caller is never blocked on the SDK catching up with the firmware: a method
+// this SDK version has no wrapper for is still reachable, and a tool built on
+// the SDK never has to drop to hand-rolled JSON-RPC over a hand-opened port.
+// Prefer the typed methods where they exist; they pin the response shape.
+//
+// params may be nil, a struct, or a map. The result is the JSON-RPC "result"
+// member, unmarshalled by the caller.
+func (c *Client) Call(ctx context.Context, method string, params any) (json.RawMessage, error) {
+	if c.proto == nil {
+		return nil, fmt.Errorf("bramble: Call %s: not connected", method)
+	}
+	return c.proto.Call(ctx, method, params)
+}
+
 // ── Traffic Debug ─────────────────────────────────────────────────────────────
 
 // SetTrafficDebug configures traffic debug telemetry recording.
