@@ -163,12 +163,138 @@ type TaskStackHWM struct {
 	HWMBytes float64 `json:"hwm_bytes"`
 }
 
+// DiagnosticsProbeIngress is the inbound PROBE token-bucket accounting from
+// bramble.getDiagnostics. PROBE is unauthenticated by design, so these buckets
+// bound how much transmission an inbound probe can buy rather than who may
+// send one; they are node-global and never per-sender.
+type DiagnosticsProbeIngress struct {
+	// Accepted counts probes that were answered.
+	Accepted float64 `json:"accepted"`
+	// DroppedReply counts probes refused by the node-wide probe ceiling and
+	// left unanswered. A rising count means the node is under probe pressure.
+	DroppedReply float64 `json:"dropped_reply"`
+	// DroppedForward counts probes answered but not rebroadcast, because the
+	// tighter forward bucket was empty. Propagation stopped while local
+	// reachability answers kept working.
+	DroppedForward float64 `json:"dropped_forward"`
+}
+
+// DiagnosticsBackpressure holds airtime backpressure counters. Non-zero values
+// mean the node shed load rather than transmitting, which distinguishes "we
+// deliberately yielded the channel" from "the radio is broken".
+type DiagnosticsBackpressure struct {
+	// FloodRelayDrops counts flood rebroadcasts dropped because the jittered
+	// relay queue was full, which is local congestion.
+	FloodRelayDrops float64 `json:"flood_relay_drops"`
+	// ProbeIngress is the inbound PROBE token-bucket accounting.
+	ProbeIngress DiagnosticsProbeIngress `json:"probe_ingress"`
+}
+
+// DiagnosticsRadioHealth reports what the radio will say about its own
+// transmit path. Neither the commanded nor the radiated output power can be
+// read back from an SX1262: SetTxParams and SetPaConfig are write-only
+// op-codes. So this pairs the level the driver programmed with the evidence
+// the chip does expose, which is enough to catch a dead PA, an unlocked PLL,
+// or config writes that never landed. Confirming the level actually radiated
+// needs external instrumentation.
+//
+// Every field beyond Supported and TxPowerDBm is a pointer because it is only
+// populated when Supported is true. A nil pointer means "the driver could not
+// read this", which is not the same as a zero readback: OCPOK false, for
+// example, is a hard fault signal, so it must not be reachable by an absent
+// field decoding to false.
+type DiagnosticsRadioHealth struct {
+	// Supported is false when the driver has no SX1262 to interrogate (the
+	// emulator's virtual radio, or the LR1110 target, whose status and error
+	// words do not share this layout). Only TxPowerDBm is populated then.
+	Supported bool `json:"supported"`
+	// TxPowerDBm is the output power the driver programmed via SetTxParams,
+	// after clamping to the chip's -9..+22 dBm range. This is intent, not
+	// measurement.
+	TxPowerDBm int `json:"tx_power_dbm"`
+	// DeviceErrors is the raw GetDeviceErrors bitmask.
+	DeviceErrors *int `json:"device_errors,omitempty"`
+	// DeviceErrorsStr holds space-separated flag names for DeviceErrors, or
+	// "none". Flags are PA_RAMP, PLL_LOCK, XOSC_START, IMG_CALIB, ADC_CALIB,
+	// PLL_CALIB, RC13M_CALIB and RC64K_CALIB.
+	DeviceErrorsStr *string `json:"device_errors_str,omitempty"`
+	// PARampError reports the latched PA_RAMP flag: the power amplifier did
+	// not ramp for a transmit, so nothing usable went on air. This is the
+	// strongest on-chip signal that commanded power is not being produced.
+	PARampError *bool `json:"pa_ramp_error,omitempty"`
+	// Status is the raw GetStatus byte.
+	Status *int `json:"status,omitempty"`
+	// ChipMode is the chip mode decoded from Status: STBY_RC, STBY_XOSC, FS,
+	// RX, TX or UNKNOWN.
+	ChipMode *string `json:"chip_mode,omitempty"`
+	// CmdStatus is the last-command status decoded from Status:
+	// data-available, timeout, processing-error, exec-failed, tx-done or
+	// reserved. exec-failed and processing-error mean the chip rejected a
+	// command.
+	CmdStatus *string `json:"cmd_status,omitempty"`
+	// OCP is the over-current protection register readback.
+	OCP *int `json:"ocp,omitempty"`
+	// OCPExpected is the OCP value the driver programmed for the high-power PA.
+	OCPExpected *int `json:"ocp_expected,omitempty"`
+	// OCPOK false means PA configuration writes are not reaching the chip,
+	// which caps output well below the commanded level. OCP is the only
+	// PA-side register that reads back, so this is the proof that the
+	// SetPaConfig path works at all.
+	OCPOK *bool `json:"ocp_ok,omitempty"`
+	// PADutyCycle is paDutyCycle from the selected SetPaConfig operating point.
+	PADutyCycle *int `json:"pa_duty_cycle,omitempty"`
+	// PAHPMax is hpMax from the selected SetPaConfig operating point.
+	PAHPMax *int `json:"pa_hp_max,omitempty"`
+	// PARatedDBm is the output level the selected PA operating point is
+	// characterized for. The driver picks the lowest characterized point that
+	// still covers the requested power.
+	PARatedDBm *int `json:"pa_rated_dbm,omitempty"`
+}
+
 // DiagnosticsResponse is returned by bramble.getDiagnostics.
+//
+// Backpressure, RadioHealth and the GPS feed counters are optional: firmware
+// omits them when the build has no such subsystem, and older firmware omits
+// them entirely. They are pointers so that absent stays distinguishable from a
+// genuine zero reading, which is the whole diagnostic value: GPSRxBytes of 0
+// with the driver running means the UART link is dead, whereas a nil
+// GPSRxBytes means the board has no GPS to report on.
 type DiagnosticsResponse struct {
 	UptimeS      float64         `json:"uptime_s"`
 	FreeHeap     float64         `json:"free_heap"`
 	Heap         DiagnosticsHeap `json:"heap"`
 	TaskStackHWM []TaskStackHWM  `json:"task_stack_hwm"`
+
+	// Backpressure holds the airtime backpressure counters.
+	Backpressure *DiagnosticsBackpressure `json:"backpressure,omitempty"`
+	// RadioHealth holds the radio's self-reported transmit-path health.
+	RadioHealth *DiagnosticsRadioHealth `json:"radio_health,omitempty"`
+
+	// GPSRxBytes counts bytes received on the GNSS UART since the driver last
+	// started. Zero with the driver running means the UART link is dead.
+	GPSRxBytes *float64 `json:"gps_rx_bytes,omitempty"`
+	// GPSRxLines counts complete NMEA-ish lines parsed out of the GNSS byte
+	// stream since the driver last started. Nonzero GPSRxBytes with zero
+	// GPSRxLines means data is flowing but not framing as lines.
+	GPSRxLines *float64 `json:"gps_rx_lines,omitempty"`
+	// GPSChip is the first $PAIR021* chip identification banner line seen from
+	// the GNSS module, truncated to 64 bytes. It points at an empty string
+	// when the board has GPS but no banner has been seen yet.
+	GPSChip *string `json:"gps_chip,omitempty"`
+	// GPSRxOverruns counts bytes dropped because an internal receive buffer
+	// was full. Always zero on backends without an intermediate buffer to
+	// overrun.
+	GPSRxOverruns *float64 `json:"gps_rx_overruns,omitempty"`
+	// GPSRxErrors counts UART/driver error events observed on the GNSS link.
+	// Always zero on backends without a distinct error-event channel.
+	GPSRxErrors *float64 `json:"gps_rx_errors,omitempty"`
+	// GPSRxDisabled counts times the GNSS UART driver silently disabled its
+	// receiver and had to be restarted by the recovery path. Expected to stay
+	// zero; nonzero means reception died and was recovered.
+	GPSRxDisabled *float64 `json:"gps_rx_disabled,omitempty"`
+	// GPSRxRearmFail counts failed attempts to hand the GNSS UART driver a
+	// receive buffer, from any supply site. Expected to stay zero.
+	GPSRxRearmFail *float64 `json:"gps_rx_rearm_fail,omitempty"`
 }
 
 // IdentityResponse is returned by bramble.getIdentity.
@@ -365,7 +491,7 @@ const (
 
 // locationTierFromInt converts a firmware uint8 tier enum to a LocationTier string.
 // The firmware onLocationEvent notification sends tier as a raw integer while
-// all other RPC methods send it as a string — this bridges the inconsistency.
+// all other RPC methods send it as a string; this bridges the inconsistency.
 func locationTierFromInt(v int) LocationTier {
 	switch v {
 	case 0:
@@ -632,6 +758,16 @@ type TrafficEvent struct {
 	PacketLen   int    `json:"packet_len"`
 	RSSI        int    `json:"rssi"` // 0 for TX events
 	IsTx        bool   `json:"is_tx"`
+
+	// SrcAddr is the claimed origin address of an RX frame, as 8 uppercase hex
+	// digits. It is empty when the frame's packet type carries no origin
+	// address and on every TX event, so "unknown" is never confused with a
+	// real address: the wire form matches ^[0-9A-F]{8}$ and can never be
+	// empty, and an all-zero address is a real value, not a sentinel. Read
+	// from the unauthenticated wire prefix, so it is telemetry, not a verified
+	// identity. Pairing it with RSSI is what makes per-peer signal strength
+	// measurable, since neighbour RSSI only refreshes on beacons.
+	SrcAddr string `json:"src_addr,omitempty"`
 }
 
 // ActionPrefix and ActionSuffix are the CTCP ACTION delimiters used for /me messages.
