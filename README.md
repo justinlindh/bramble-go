@@ -107,9 +107,11 @@ ble := transport.NewBLE("Bramble", transport.WithBLEScanTimeout(15*time.Second))
 
 All three constructors share the same functional options: `WithAuthToken` (every transport), `WithBaudRate` (serial), and `WithBLEScanTimeout` (BLE).
 
+The firmware's NUS characteristics require an encrypted link, so the host must already be paired and bonded with the device before calling `Connect`; this SDK does not pair automatically. A stale or missing bond makes writes fail silently (no error, no response).
+
 Pairing itself is handled by the host OS, and which code it asks for depends on the node: a node with a display shows a random 6-digit code per attempt, while a node without one uses a static passkey (or no code at all until one is set). `BleSecurity(ctx)` reports that posture and `SetBlePasskey(ctx, passkey)` configures it.
 
-For additional BLE guidance and full transport notes, see [docs/API.md](docs/API.md#ble-transport-details).
+See [docs/API.md](docs/API.md#ble-transport-details) for the pairing recipe and full BLE transport notes.
 
 ## API Overview
 
