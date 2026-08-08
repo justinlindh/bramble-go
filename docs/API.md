@@ -33,6 +33,8 @@ All methods accept a `context.Context` for timeout/cancellation.
 | `Neighbors(ctx)` | `[]Neighbor` | Direct radio neighbors (RSSI, SNR, last heard) |
 | `Routes(ctx)` | `[]Route` | Routing table entries |
 | `DmSessions(ctx)` | `*DmSessionsResponse` | DM session table: which peers a directed send can reach |
+| `RollCall(ctx)` | `*RollCallLedger` | Ledger of the roll-call this node started: who answered with a verified signature, and who is missing |
+| `ExportTopology(ctx)` | `*TopologyExport` | This node's observed mesh state (identity, radio and frequency plan, neighbours, routes) as one digital-twin document |
 | `Airtime(ctx)` | `*AirtimeStats` | Per-tier airtime budget usage |
 | `Ping(ctx)` | `error` | Health check (returns nil on success) |
 | `Messages(ctx)` | `[]Message` | Stored message history |
@@ -93,6 +95,23 @@ for _, s := range dm.Sessions {
 // framebuffer back; Pixels is the raw frame, not an encoded image.
 shot, _ := client.Screenshot(ctx)
 fmt.Printf("%dx%d %s, %d bytes\n", shot.Width, shot.Height, shot.Format, len(shot.Pixels))
+
+// Roll-call ledger. What it may claim depends on Anchored: only an
+// anchor-certified expected set makes Missing meaningful, so an un-anchored
+// mesh reports observed responders and names nobody missing.
+led, _ := client.RollCall(ctx)
+if led.Anchored {
+    fmt.Printf("%d of %d answered, missing %v\n", led.Responded, led.Expected, led.Missing)
+} else {
+    fmt.Printf("%d observed responders (no anchor, so no expected set)\n", led.Responded)
+}
+
+// One node's view of the mesh, shaped for the digital-twin importer. Collect
+// one export per node to reconstruct the deployment as a runnable scenario.
+export, _ := client.ExportTopology(ctx)
+fmt.Printf("%s: sf%d bw%d %s, %d neighbours, %d routes\n",
+    export.Node.Address, export.Radio.SF, export.Radio.BwHz, export.Radio.Region,
+    len(export.Neighbors), len(export.Routes))
 ```
 
 ### Screenshot Pixel Format
@@ -135,6 +154,7 @@ Prefer the typed methods where they exist; they pin the response shape.
 | `BroadcastOnChannel(ctx, channel, text)` | `*SendResult` | Broadcast on a specific channel index |
 | `BroadcastOnChannelCritical(ctx, channel, text)` | `*SendResult` | Critical-priority broadcast on a specific channel |
 | `SendProbe(ctx)` | `*SendProbeResult` | Network reachability probe |
+| `StartRollCall(ctx, text)` | `*StartRollCallResponse` | Start an attested roll-call; a busy or rate-limited start returns `OK` false with a reason and `RetryAfterMs` |
 | `SetRadio(ctx, config)` | `error` | Update radio parameters |
 | `SetNodeName(ctx, name)` | `error` | Set node display name (max 32 chars) |
 | `SetWifiConfig(ctx, ssid, password)` | `*SetWifiConfigResponse` | Provision Wi-Fi station credentials (empty password = open network) |
@@ -227,6 +247,19 @@ if sec.Mode != bramble.BleSecurityModePasskeyDisplay {
     fmt.Println("ble mode now:", pk.Mode) // all existing bonds were wiped
 }
 
+// Attested roll-call. The primitive is expensive (one flood per round plus
+// one unicast answer per member), so the node rate limits it and refuses a
+// second concurrent one; both refusals arrive as ok:false in a successful
+// call, so check resp.OK rather than only the error.
+rc, err := client.StartRollCall(ctx, "muster")
+if err != nil {
+    log.Fatalf("startRollCall call failed: %v", err)
+}
+if !rc.OK {
+    log.Fatalf("node refused the roll-call: %s (retry in %dms)", rc.Reason, rc.RetryAfterMs)
+}
+fmt.Printf("roll-call %s: %d rounds over %dms\n", rc.RollCallID, rc.RoundsTotal, rc.WindowMs)
+
 // Audio controls
 _ = client.PlayTone(ctx, "startup")
 _ = client.SetVolume(ctx, 75)
@@ -289,6 +322,9 @@ A network key admits members but does not stop a member from minting extra ident
 | `OnLocationEvent(fn)` | `func(LocationEvent)` | Location sharing event notifications |
 | `OnPeerLocation(fn)` | `func(PeerLocationEvent)` | Peer location cache update notifications (no payload; call `PeerLocations`) |
 | `OnIdentityChange(fn)` | `func(IdentityChangeEvent)` | Node identity regeneration notifications (address collision) |
+| `OnRollCall(fn)` | `func(RollCallAnnounce)` | Raised on a member that heard a roll-call announce and queued its signed answer |
+| `OnRollCallResponse(fn)` | `func(RollCallResponse)` | Raised on the initiator once a member's signature verified |
+| `OnRollCallComplete(fn)` | `func(RollCallComplete)` | Raised on the initiator when the collection window closes |
 | `OnDecodeError(fn)` | `func(method string, err error, payload []byte)` | Called when a notification's JSON payload cannot be decoded |
 
 ```go
@@ -309,6 +345,18 @@ client.OnTrafficEvent(func(e bramble.TrafficEvent) {
     if e.SrcAddr != "" {
         fmt.Printf("  from %s at %d dBm\n", e.SrcAddr, e.RSSI)
     }
+})
+
+client.OnRollCall(func(a bramble.RollCallAnnounce) {
+    fmt.Printf("roll-call %s from %s: %q\n", a.RollCallID, a.From, a.Text)
+})
+
+client.OnRollCallResponse(func(r bramble.RollCallResponse) {
+    fmt.Printf("%s answered roll-call %s (%d verified so far)\n", r.Address, r.RollCallID, r.Responded)
+})
+
+client.OnRollCallComplete(func(c bramble.RollCallComplete) {
+    fmt.Printf("roll-call %s closed: %d answered, %d unattested\n", c.RollCallID, c.Responded, c.Unattested)
 })
 
 client.OnDecodeError(func(method string, err error, payload []byte) {

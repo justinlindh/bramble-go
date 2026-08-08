@@ -59,7 +59,7 @@ func main() {
     if err != nil {
         log.Fatal(err)
     }
-    fmt.Printf("Node %s — %d peers, uptime %s\n",
+    fmt.Printf("Node %s: %d peers, uptime %s\n",
         status.Address, status.Peers,
         time.Duration(status.UptimeSec)*time.Second)
 
@@ -119,7 +119,8 @@ All client methods accept `context.Context` for timeout and cancellation.
 
 - **Query methods**: Read node state and telemetry (`Status`, `Neighbors`, `Routes`, `Config`, delivery/traffic reads, etc.).
 - **Action methods**: Send messages, probe, modify configuration, run maintenance operations (`Send*`, channel/radio config, `Reboot`, `OTAUpdate`, etc.).
-- **Notification callbacks**: Subscribe to async events such as incoming messages, acks, probes, traffic events, Wi-Fi/GPS/location updates.
+- **Fleet diagnostics**: `StartRollCall` and `RollCall` run an attested member census and read its ledger; `ExportTopology` returns one node's observed mesh state as the document the simulator's digital-twin importer reads.
+- **Notification callbacks**: Subscribe to async events such as incoming messages, acks, probes, roll-call progress, traffic events, Wi-Fi/GPS/location updates.
 - **Action message helpers**: `WrapAction`, `IsAction`, and `ActionText` support IRC-style `/me` messages.
 - **Test doubles**: the `transport/transporttest` package provides an in-memory `transport.Transport` (`transporttest.NewMock`) for consumer tests.
 
@@ -190,4 +191,4 @@ Examples:
 
 ## License
 
-MIT — see [LICENSE](LICENSE)
+MIT, see [LICENSE](LICENSE)
