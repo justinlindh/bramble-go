@@ -19,7 +19,7 @@ func TestClient_OnPeerLocation(t *testing.T) {
 
 	select {
 	case <-fired:
-		// callback fired — no fields to check on the empty struct
+		// callback fired: no fields to check on the empty struct
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for OnPeerLocation callback")
 	}
@@ -84,7 +84,7 @@ func TestClient_WithOnPeerLocation_Option(t *testing.T) {
 
 	select {
 	case <-fired:
-		// success — WithOnPeerLocation option wired up correctly
+		// success: WithOnPeerLocation option wired up correctly
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for WithOnPeerLocation callback")
 	}

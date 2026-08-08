@@ -399,21 +399,25 @@ type Neighbor struct {
 	// LastSeenAgoMs is milliseconds since this neighbor was last heard
 	// (relative duration, not an absolute timestamp).
 	LastSeenAgoMs int64 `json:"last_seen_ms"`
-	// DeliveryRate is 0-255 where 255 = 100% packet delivery rate.
-	DeliveryRate int `json:"delivery_rate"`
-	// AirtimeRemaining is 0-100% airtime budget remaining for this neighbor.
-	AirtimeRemaining int `json:"airtime_remaining"`
+	// DeliveryRate is 0-255 where 255 = 100% packet delivery rate. The wire
+	// key is camelCase, matching the Neighbor schema in api/openapi.yaml and
+	// the emitter in main/topology_export.c.
+	DeliveryRate int `json:"deliveryRate"`
+	// AirtimeRemaining is the neighbor-advertised airtime budget remaining.
+	AirtimeRemaining int `json:"airtimeRemaining"`
 }
 
-// Route is a routing table entry.
+// Route is a routing table entry. The fields are exactly the six the Route
+// schema in api/openapi.yaml declares required and main/topology_export.c
+// emits, for both bramble.getRoutes and bramble.exportTopology.
 type Route struct {
-	Dest       string `json:"dest"`
-	NextHop    string `json:"next_hop"`
-	HopCount   int    `json:"hop_count"`
-	Metric     int    `json:"metric"`
-	State      string `json:"state"`
-	LastUsedMs int64  `json:"last_used_ms"`
-	UseCount   int    `json:"use_count,omitempty"`
+	Dest     string `json:"dest"`
+	NextHop  string `json:"next_hop"`
+	HopCount int    `json:"hop_count"`
+	Metric   int    `json:"metric"`
+	// State is one of discovering, unverified, active, stale, broken, unknown.
+	State    string `json:"state"`
+	UseCount int    `json:"use_count"`
 }
 
 // DmSession is one used slot of the node's DM session table, as returned by
@@ -843,6 +847,267 @@ type TrafficEvent struct {
 	// signal strength measurable, since neighbour RSSI only refreshes on
 	// beacons.
 	SrcAddr string `json:"src_addr,omitempty"`
+}
+
+// ── Roll-Call Types ──────────────────────────────────────────────────────────
+
+// Roll-call refusal reasons. A refused start comes back as a successful call
+// carrying OK false and one of these in Reason, so callers switch on the
+// reason rather than parse an error string.
+const (
+	// RollCallRefusalBusy means a roll-call this node started is still collecting.
+	RollCallRefusalBusy = "busy"
+	// RollCallRefusalRateLimited means the start landed inside the enforced
+	// floor between two roll-calls started by this node.
+	RollCallRefusalRateLimited = "rate_limited"
+	// RollCallRefusalNotTransmitted means the announce never reached the air,
+	// so nothing is owed an answer and the rate limiter was not charged.
+	RollCallRefusalNotTransmitted = "not_transmitted"
+)
+
+// StartRollCallParams contains parameters for bramble.startRollCall. Every
+// field is optional.
+type StartRollCallParams struct {
+	// Text is the operator payload the announce carries. The node bounds it
+	// (it reports the bound as RollCallLedger.MaxTextBytes) and rejects an
+	// oversized payload as a malformed request, an RPC error rather than an
+	// OK-false refusal. The SDK sends what it is given and does not validate.
+	Text string `json:"text,omitempty"`
+}
+
+// StartRollCallResponse is returned by bramble.startRollCall.
+//
+// OK true carries the roll-call identifier and schedule. OK false is an
+// operational refusal carrying Reason, RetryAfterMs and MinIntervalMs, and
+// none of the roll-call fields are set.
+type StartRollCallResponse struct {
+	// OK reports whether the first announce round reached the air.
+	OK bool `json:"ok"`
+	// Reason is why the roll-call was refused, one of RollCallRefusalBusy,
+	// RollCallRefusalRateLimited or RollCallRefusalNotTransmitted. Set only
+	// when OK is false.
+	Reason string `json:"reason,omitempty"`
+	// RetryAfterMs is milliseconds until a start would be accepted, 0 meaning
+	// immediately. Set only when OK is false.
+	RetryAfterMs int `json:"retry_after_ms,omitempty"`
+	// MinIntervalMs is the enforced floor between two roll-calls started by
+	// this node. Set only when OK is false.
+	MinIntervalMs int `json:"min_interval_ms,omitempty"`
+	// RollCallID is the roll-call identifier as 8-char uppercase hex.
+	RollCallID string `json:"rollcall_id,omitempty"`
+	// WindowMs is milliseconds from start to ledger close.
+	WindowMs int `json:"window_ms,omitempty"`
+	// RoundsTotal is the announce rounds this roll-call will send, including
+	// the first.
+	RoundsTotal int `json:"rounds_total,omitempty"`
+	// Expected is the size of the anchor-certified expected set, always 0 on
+	// an un-anchored mesh where no authoritative expected set exists.
+	Expected int `json:"expected,omitempty"`
+	// Anchored reports whether this node pins anchor-certified peers, the only
+	// configuration in which missing members can be named.
+	Anchored bool `json:"anchored,omitempty"`
+}
+
+// RollCallResponder is one row of the roll-call ledger.
+type RollCallResponder struct {
+	// Address is the responder address as 8-char uppercase hex.
+	Address string `json:"address"`
+	// Responded is true when an Ed25519 signature over (roll-call id,
+	// initiator, responder) verified against this address's pinned identity
+	// key. A row can exist with Responded false when the announce's delivery
+	// receipt reported a path for a member that never answered.
+	Responded bool `json:"responded"`
+	// AtMs is milliseconds into the roll-call at which the answer was
+	// recorded. Set only when Responded is true.
+	AtMs int64 `json:"at_ms,omitempty"`
+	// Round is the announce round the answer named. Set only when Responded
+	// is true.
+	Round int `json:"round,omitempty"`
+	// Hops is the relay path length, set only when a delivery receipt supplied
+	// one.
+	Hops int `json:"hops,omitempty"`
+	// Path is the relay path initiator to responder as 8-char uppercase hex
+	// addresses, set only when a delivery receipt supplied one.
+	Path []string `json:"path,omitempty"`
+}
+
+// RollCallLedger is the bramble.getRollCall result: the ledger of the
+// roll-call this node started.
+//
+// Anchored is what decides how much the ledger can honestly claim. On an
+// anchored mesh the expected set is this node's anchor-certified peers, so
+// Missing names the members that did not answer. On an un-anchored mesh there
+// is no authoritative expected set: Anchored is false, Expected is 0 and
+// Missing is empty by construction, and the ledger reports observed
+// responders only.
+type RollCallLedger struct {
+	// Active is false when this node has never started a roll-call.
+	Active bool `json:"active"`
+	// RollCallID is the roll-call identifier as 8-char uppercase hex.
+	RollCallID string `json:"rollcall_id,omitempty"`
+	// Open is true while the ledger is still collecting answers.
+	Open bool `json:"open,omitempty"`
+	// Text is the operator payload the announce carried.
+	Text string `json:"text,omitempty"`
+	// RoundsSent is the announce rounds sent so far.
+	RoundsSent int `json:"rounds_sent,omitempty"`
+	// RoundsTotal is the announce rounds a roll-call sends, including the first.
+	RoundsTotal int `json:"rounds_total"`
+	// WindowMs is milliseconds from start to ledger close.
+	WindowMs int `json:"window_ms"`
+	// ElapsedMs is milliseconds since this roll-call started.
+	ElapsedMs int64 `json:"elapsed_ms,omitempty"`
+	// MinIntervalMs is the enforced floor between two roll-calls started by
+	// this node.
+	MinIntervalMs int `json:"min_interval_ms"`
+	// MaxTextBytes is the maximum operator payload size the node accepts.
+	MaxTextBytes int `json:"max_text_bytes"`
+	// Anchored reports whether the expected set is anchor-certified and
+	// therefore authoritative.
+	Anchored bool `json:"anchored,omitempty"`
+	// Expected is the size of the anchor-certified expected set, 0 when not
+	// anchored.
+	Expected int `json:"expected,omitempty"`
+	// Responded counts members whose signed answer verified.
+	Responded int `json:"responded,omitempty"`
+	// Unattested counts answers that could not be attested: a signature that
+	// did not verify, a responder that does not match the sending envelope, or
+	// a responder this node holds no pinned identity key for. Counted, never
+	// recorded as a responder.
+	Unattested int `json:"unattested,omitempty"`
+	// Overflow counts answers dropped because the ledger table was full.
+	Overflow int `json:"overflow,omitempty"`
+	// Late counts answers that arrived after the ledger closed.
+	Late int `json:"late,omitempty"`
+	// PendingDropped counts answers THIS node could not queue because its
+	// pending-answer queue was full, reported so a node that failed to take
+	// part says so locally.
+	PendingDropped int `json:"pending_dropped"`
+	// AnswerLimited counts answers THIS node refused because it had already
+	// spent its answer budget. Non-zero means something on this mesh is asking
+	// for roll-calls faster than the fleet has agreed to pay for them.
+	AnswerLimited int `json:"answer_limited"`
+	// AnswerMaxPerHour is the answers this node will emit in any rolling hour,
+	// whoever asks: the member-side bound that keeps a roll-call's fleet-wide
+	// cost independent of how fast an initiator asks for one.
+	AnswerMaxPerHour int `json:"answer_max_per_hour"`
+	// MissingCount is expected members with no verified answer. Always 0 on an
+	// un-anchored mesh: absence of an authoritative expected set means nothing
+	// can honestly be called missing.
+	MissingCount int `json:"missing_count,omitempty"`
+	// Missing lists expected members with no verified answer, as 8-char
+	// uppercase hex.
+	Missing []string `json:"missing,omitempty"`
+	// Responders is one row per address the ledger recorded.
+	Responders []RollCallResponder `json:"responders,omitempty"`
+}
+
+// RollCallAnnounce is delivered via bramble.onRollCall notifications, raised
+// on a MEMBER that heard a roll-call announce and queued its own signed
+// answer. Raised once per roll-call: the re-announce rounds are deduped before
+// this point.
+type RollCallAnnounce struct {
+	// RollCallID is the roll-call identifier as 8-char uppercase hex.
+	RollCallID string `json:"rollcall_id"`
+	// From is the initiator address as 8-char uppercase hex.
+	From string `json:"from"`
+	// Text is the operator payload the announce carried.
+	Text string `json:"text"`
+	// Round is the announce round this frame was (1-based).
+	Round int `json:"round"`
+}
+
+// RollCallResponse is delivered via bramble.onRollCallResponse notifications,
+// raised on the INITIATOR once a member's signature verified against its
+// pinned identity key. An answer that failed to attest raises nothing; it is
+// only counted, in RollCallLedger.Unattested.
+type RollCallResponse struct {
+	// RollCallID is the roll-call identifier as 8-char uppercase hex.
+	RollCallID string `json:"rollcall_id"`
+	// Address is the responder address as 8-char uppercase hex.
+	Address string `json:"address"`
+	// Round is the announce round the answer named.
+	Round int `json:"round"`
+	// Responded counts members whose signed answer has verified so far.
+	Responded int `json:"responded"`
+	// Expected is the size of the anchor-certified expected set, 0 when not
+	// anchored.
+	Expected int `json:"expected"`
+}
+
+// RollCallComplete is delivered via bramble.onRollCallComplete notifications,
+// raised on the INITIATOR exactly once when the collection window closes. The
+// ledger stays readable afterwards via Client.RollCall.
+type RollCallComplete struct {
+	// RollCallID is the roll-call identifier as 8-char uppercase hex.
+	RollCallID string `json:"rollcall_id"`
+	// Responded counts members whose signed answer verified.
+	Responded int `json:"responded"`
+	// Expected is the size of the anchor-certified expected set, 0 when not
+	// anchored.
+	Expected int `json:"expected"`
+	// Anchored reports whether the expected set is anchor-certified. False
+	// means the ledger reports observed responders only and names nobody
+	// missing.
+	Anchored bool `json:"anchored"`
+	// Rounds is the announce rounds sent.
+	Rounds int `json:"rounds"`
+	// Unattested counts answers that could not be attested.
+	Unattested int `json:"unattested"`
+}
+
+// ── Topology Export Types ────────────────────────────────────────────────────
+
+// TopologyNode is the identity block of a topology export.
+type TopologyNode struct {
+	// Address is this node's address as 8-char uppercase hex.
+	Address string `json:"address"`
+	// Name is the configured node name, empty when unset.
+	Name            string `json:"name,omitempty"`
+	FirmwareVersion string `json:"firmware_version"`
+	ProtocolVersion string `json:"protocol_version"`
+	Hardware        string `json:"hardware"`
+	// UptimeS is seconds since boot, the age bound on every observation in the
+	// export.
+	UptimeS int64 `json:"uptime_s"`
+}
+
+// TopologyRadio is the runtime PHY plus the compiled-in frequency plan of a
+// topology export. SF, BwHz and CodingRate are what price a frame's
+// time-on-air; the plan's duty cycle bounds what the deployment may spend.
+type TopologyRadio struct {
+	FrequencyMhz float64 `json:"frequency_mhz"`
+	SF           int     `json:"sf"`
+	BwHz         int     `json:"bw_hz"`
+	// CodingRate is 1 to 4, meaning 4/5 through 4/8.
+	CodingRate int `json:"coding_rate"`
+	TxPowerDbm int `json:"tx_power_dbm"`
+	// Region is the frequency plan name, for example US915.
+	Region string `json:"region"`
+	// Regulatory is the regulatory regime the plan follows.
+	Regulatory string `json:"regulatory"`
+	// MaxDutyCyclePct is the plan duty-cycle ceiling; 100 means no limit.
+	MaxDutyCyclePct int `json:"max_duty_cycle_pct"`
+	// DutyCycleEnforced reports whether the ceiling is hard-enforced or
+	// advisory.
+	DutyCycleEnforced bool `json:"duty_cycle_enforced"`
+}
+
+// TopologyExport is the bramble.exportTopology result: one node's observed
+// mesh state as a single document, shaped for the simulator's digital-twin
+// importer. Observation only: every field is state the node already keeps,
+// read at the moment of the call.
+type TopologyExport struct {
+	// TwinSchema is the document schema version. The importer refuses a
+	// version it does not know rather than guessing at fields.
+	TwinSchema int           `json:"twin_schema"`
+	Node       TopologyNode  `json:"node"`
+	Radio      TopologyRadio `json:"radio"`
+	// Neighbors is the nodes heard directly, with the link quality they were
+	// heard at. Same shape Neighbors returns, written by the same emitter.
+	Neighbors []Neighbor `json:"neighbors"`
+	// Routes is the routing table, the same shape Routes returns.
+	Routes []Route `json:"routes"`
 }
 
 // ActionPrefix and ActionSuffix are the CTCP ACTION delimiters used for /me messages.

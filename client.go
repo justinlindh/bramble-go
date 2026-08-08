@@ -28,6 +28,9 @@ type Client struct {
 	onProbeCompleteFn     func(ProbeComplete)
 	onPeerLocationFn      func(PeerLocationEvent)
 	onIdentityChangeFn    func(IdentityChangeEvent)
+	onRollCallFn          func(RollCallAnnounce)
+	onRollCallResponseFn  func(RollCallResponse)
+	onRollCallCompleteFn  func(RollCallComplete)
 	onDecodeErrorFn       func(method string, err error, payload []byte)
 }
 
@@ -132,6 +135,9 @@ func (c *Client) notifyLoop() {
 		onProbeComplete := c.onProbeCompleteFn
 		onPeerLocation := c.onPeerLocationFn
 		onIdentityChange := c.onIdentityChangeFn
+		onRollCall := c.onRollCallFn
+		onRollCallResponse := c.onRollCallResponseFn
+		onRollCallComplete := c.onRollCallCompleteFn
 		onDecodeError := c.onDecodeErrorFn
 		c.mu.Unlock()
 
@@ -213,6 +219,27 @@ func (c *Client) notifyLoop() {
 				var evt IdentityChangeEvent
 				if c.notifyDecode(n.Method, n.Params, &evt, onDecodeError) {
 					onIdentityChange(evt)
+				}
+			}
+		case "bramble.onRollCall":
+			if onRollCall != nil {
+				var evt RollCallAnnounce
+				if c.notifyDecode(n.Method, n.Params, &evt, onDecodeError) {
+					onRollCall(evt)
+				}
+			}
+		case "bramble.onRollCallResponse":
+			if onRollCallResponse != nil {
+				var evt RollCallResponse
+				if c.notifyDecode(n.Method, n.Params, &evt, onDecodeError) {
+					onRollCallResponse(evt)
+				}
+			}
+		case "bramble.onRollCallComplete":
+			if onRollCallComplete != nil {
+				var evt RollCallComplete
+				if c.notifyDecode(n.Method, n.Params, &evt, onDecodeError) {
+					onRollCallComplete(evt)
 				}
 			}
 		}
@@ -613,6 +640,50 @@ func (c *Client) PeerLocations(ctx context.Context) ([]LocationPeer, error) {
 	return resp.PeerLocations, nil
 }
 
+// RollCall returns the ledger of the roll-call this node started: which
+// members answered with a verified signature, how far into the roll-call each
+// answered, and the relay path where the broadcast delivery-receipt machinery
+// supplied one. The ledger stays readable after the collection window closes,
+// and Active is false when this node has never started a roll-call.
+//
+// What the ledger may claim depends on Anchored. On an anchored mesh the
+// expected set is this node's anchor-certified peers, so Missing names the
+// members that did not answer. On an un-anchored mesh there is no
+// authoritative expected set: Anchored is false, Expected is 0 and Missing is
+// empty by construction, and the ledger reports observed responders only.
+func (c *Client) RollCall(ctx context.Context) (*RollCallLedger, error) {
+	raw, err := c.proto.Call(ctx, "bramble.getRollCall", nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp RollCallLedger
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode RollCallLedger: %w", err)
+	}
+	return &resp, nil
+}
+
+// ExportTopology returns this node's view of the mesh as a single document:
+// its identity, the neighbours it hears with per-link RSSI and SNR, its
+// routing table, and the PHY and frequency-plan parameters that decide
+// time-on-air. Collect one export per node and feed the files to the
+// simulator's digital-twin importer to reconstruct the deployment as a
+// runnable scenario.
+//
+// Observation only: every field is state the node already keeps, read at the
+// moment of the call, bounded in age by Node.UptimeS.
+func (c *Client) ExportTopology(ctx context.Context) (*TopologyExport, error) {
+	raw, err := c.proto.Call(ctx, "bramble.exportTopology", nil)
+	if err != nil {
+		return nil, err
+	}
+	var resp TopologyExport
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode TopologyExport: %w", err)
+	}
+	return &resp, nil
+}
+
 // ── Action / Config Methods ───────────────────────────────────────────────────
 
 // Send sends a unicast text message to dest (uint32 address).
@@ -707,6 +778,32 @@ func (c *Client) SendProbe(ctx context.Context) (*SendProbeResult, error) {
 		if _, perr := fmt.Sscanf(resp.ProbeIDHex, "%x", &parsed); perr == nil {
 			resp.ProbeID = parsed
 		}
+	}
+	return &resp, nil
+}
+
+// StartRollCall starts an attested roll-call: an authenticated broadcast
+// asking every member to answer with an Ed25519-signed, identity-bound reply.
+// text is the operator payload the announce carries and may be empty.
+//
+// The primitive is expensive (one flood per round plus one unicast answer per
+// member), so the firmware rate limits initiation and lets only one roll-call
+// this node started collect at a time. Both refusals arrive as a successful
+// call with OK false plus Reason and RetryAfterMs, so check resp.OK: a non-nil
+// error here means the RPC itself failed, and a payload larger than the node's
+// bound (RollCallLedger.MaxTextBytes) is one such RPC error, an invalid-params
+// rejection rather than a refusal.
+//
+// Progress arrives as OnRollCallResponse callbacks followed by
+// OnRollCallComplete; the ledger is readable at any time via RollCall.
+func (c *Client) StartRollCall(ctx context.Context, text string) (*StartRollCallResponse, error) {
+	raw, err := c.proto.Call(ctx, "bramble.startRollCall", StartRollCallParams{Text: text})
+	if err != nil {
+		return nil, err
+	}
+	var resp StartRollCallResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode StartRollCallResponse: %w", err)
 	}
 	return &resp, nil
 }
@@ -1190,6 +1287,39 @@ func (c *Client) OnPeerLocation(fn func(PeerLocationEvent)) {
 func (c *Client) OnIdentityChange(fn func(IdentityChangeEvent)) {
 	c.mu.Lock()
 	c.onIdentityChangeFn = fn
+	c.mu.Unlock()
+}
+
+// OnRollCall registers a callback invoked when a bramble.onRollCall
+// notification arrives. The firmware raises it on a MEMBER that heard a
+// roll-call announce and queued its own signed answer, once per roll-call: the
+// re-announce rounds are deduped before this point. It is surfaced as its own
+// event rather than filed as a chat message because a roll-call is an
+// operational request, not traffic somebody sent.
+func (c *Client) OnRollCall(fn func(RollCallAnnounce)) {
+	c.mu.Lock()
+	c.onRollCallFn = fn
+	c.mu.Unlock()
+}
+
+// OnRollCallResponse registers a callback invoked when a
+// bramble.onRollCallResponse notification arrives. The firmware raises it on
+// the INITIATOR once per responder, after that member's signature verified
+// against its pinned identity key. An answer that failed to attest raises
+// nothing; it is only counted, in RollCallLedger.Unattested.
+func (c *Client) OnRollCallResponse(fn func(RollCallResponse)) {
+	c.mu.Lock()
+	c.onRollCallResponseFn = fn
+	c.mu.Unlock()
+}
+
+// OnRollCallComplete registers a callback invoked when a
+// bramble.onRollCallComplete notification arrives. The firmware raises it on
+// the INITIATOR exactly once, when the collection window closes; the ledger
+// remains readable afterwards via RollCall.
+func (c *Client) OnRollCallComplete(fn func(RollCallComplete)) {
+	c.mu.Lock()
+	c.onRollCallCompleteFn = fn
 	c.mu.Unlock()
 }
 

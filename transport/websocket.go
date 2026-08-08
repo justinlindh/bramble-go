@@ -134,12 +134,12 @@ func (w *WebSocket) Receive(ctx context.Context) ([]byte, error) {
 			return nil, ctx.Err()
 		}
 
-		// Unexpected disconnect — attempt reconnect.
+		// Unexpected disconnect: attempt reconnect.
 		if rerr := w.reconnect(); rerr != nil {
 			return nil, fmt.Errorf("bramble/transport/websocket: reconnect failed: %w", rerr)
 		}
 
-		// Reconnected — return a sentinel so the caller retries.
+		// Reconnected: return a sentinel so the caller retries.
 		return nil, ErrReconnecting
 	}
 	return data, nil

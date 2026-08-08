@@ -129,7 +129,7 @@ func (p *Protocol) reader() {
 				// Drop if consumer is slow.
 			}
 		}
-		// Otherwise: message has both ID and Method — this is the serial echo of our
+		// Otherwise: message has both ID and Method, so this is the serial echo of our
 		// own request reflecting back from the device's console. Discard silently.
 	}
 }

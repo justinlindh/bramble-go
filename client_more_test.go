@@ -19,7 +19,7 @@ func TestClient_QueryMethodsCoverage(t *testing.T) {
 		t.Fatalf("Identity failed: resp=%+v err=%v", id, err)
 	}
 
-	mock.QueueResponse(`{"jsonrpc":"2.0","id":2,"result":{"routes":[{"dest":"11111111","next_hop":"22222222","hop_count":2,"metric":5,"state":"active","last_used_ms":99}]}}`)
+	mock.QueueResponse(`{"jsonrpc":"2.0","id":2,"result":{"routes":[{"dest":"11111111","next_hop":"22222222","hop_count":2,"metric":5,"state":"active","use_count":99}]}}`)
 	routes, err := c.Routes(ctx)
 	if err != nil || len(routes) != 1 || routes[0].Dest != "11111111" {
 		t.Fatalf("Routes failed: routes=%+v err=%v", routes, err)

@@ -389,7 +389,7 @@ func TestValidateAuthResponse(t *testing.T) {
 }
 
 // TestBLEAuthenticate_NoToken verifies that authenticate is a no-op when no
-// auth token is configured — it must return nil without touching BLE hardware.
+// auth token is configured: it must return nil without touching BLE hardware.
 func TestBLEAuthenticate_NoToken(t *testing.T) {
 	b := NewBLE("")
 	if err := b.authenticate(context.Background()); err != nil {
@@ -402,7 +402,7 @@ func TestBLEAuthenticate_NoToken(t *testing.T) {
 // ErrNotConnected before any BLE hardware is accessed.
 func TestBLEAuthenticate_SendFails(t *testing.T) {
 	b := NewBLE("", WithAuthToken("secret-token"))
-	// b.connected is false — Send() returns ErrNotConnected
+	// b.connected is false, so Send() returns ErrNotConnected
 	err := b.authenticate(context.Background())
 	if err == nil {
 		t.Fatal("expected error, got nil")
