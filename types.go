@@ -52,6 +52,39 @@ type SetWifiConfigResponse struct {
 	Applied string `json:"applied"` // "live" or "reboot_required"
 }
 
+// BleSecurityMode is the SMP pairing mode a node offers over BLE.
+type BleSecurityMode string
+
+const (
+	// BleSecurityModePasskeyDisplay means the node shows a random 6-digit code
+	// on its own screen for each pairing attempt. There is nothing to
+	// configure, and such nodes refuse a static passkey.
+	BleSecurityModePasskeyDisplay BleSecurityMode = "passkey-display"
+	// BleSecurityModeStaticPasskey means an operator-set 6-digit code is
+	// stored on the node and every pairing client must enter it.
+	BleSecurityModeStaticPasskey BleSecurityMode = "static-passkey"
+	// BleSecurityModeJustWorks means no code is required: pairing completes
+	// unauthenticated, which leaves it open to a man-in-the-middle.
+	BleSecurityModeJustWorks BleSecurityMode = "just-works"
+)
+
+// BleSecurity is returned by bramble.getBleSecurity. The passkey value itself
+// is write-only on the node and no method reports it, so only whether one is
+// set appears here.
+type BleSecurity struct {
+	Mode             BleSecurityMode `json:"mode"`
+	StaticPasskeySet bool            `json:"staticPasskeySet"`
+}
+
+// SetBlePasskeyResponse is returned by bramble.setBlePasskey. A refusal comes
+// back as a successful call with OK false and Error set, not as a JSON-RPC
+// error, so callers must check OK rather than only the returned error.
+type SetBlePasskeyResponse struct {
+	OK    bool            `json:"ok"`
+	Mode  BleSecurityMode `json:"mode,omitempty"`
+	Error string          `json:"error,omitempty"`
+}
+
 // BatteryStatus is returned by bramble.getBattery.
 type BatteryStatus struct {
 	VoltageMV  int `json:"voltage_mv"`

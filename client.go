@@ -265,6 +265,21 @@ func (c *Client) SetWifiConfig(ctx context.Context, ssid, password string) (*Set
 	return &resp, nil
 }
 
+// BleSecurity returns the node's BLE pairing posture: the SMP mode it offers
+// and whether a static passkey is stored. The passkey value itself is
+// write-only on the node and is never returned.
+func (c *Client) BleSecurity(ctx context.Context) (*BleSecurity, error) {
+	raw, err := c.proto.Call(ctx, "bramble.getBleSecurity", nil)
+	if err != nil {
+		return nil, fmt.Errorf("bramble: get ble security: %w", err)
+	}
+	var resp BleSecurity
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode BleSecurity: %w", err)
+	}
+	return &resp, nil
+}
+
 // Battery returns battery voltage in mV and charge percentage.
 func (c *Client) Battery(ctx context.Context) (*BatteryStatus, error) {
 	raw, err := c.proto.Call(ctx, "bramble.getBattery", nil)
@@ -754,6 +769,33 @@ func (c *Client) SetAuthToken(ctx context.Context, token string) error {
 		return err
 	}
 	return checkOK(raw, "setAuthToken")
+}
+
+// SetBlePasskey sets or clears the node's static BLE pairing passkey. A
+// 6-digit passkey is stored and required from every pairing client; an empty
+// string clears it and returns the node to unauthenticated Just Works pairing.
+// The SDK sends the passkey member on every call, including the clearing one,
+// because the node treats an omitted member as an error rather than a clear:
+// a caller cannot wipe a configured passkey by forgetting the argument.
+//
+// Setting, changing, or clearing the passkey wipes the node's stored BLE
+// bonds, so every previously paired client must pair again.
+//
+// Like SetWifiConfig and SetNodeName, this does no client-side validation; the
+// node rejects a passkey that is not exactly 6 digits. Refusals (a node that
+// displays its own random code, a malformed passkey, a failed bond wipe)
+// arrive as a successful call with OK false and Error set, so check
+// resp.OK: a non-nil error here means the RPC itself failed.
+func (c *Client) SetBlePasskey(ctx context.Context, passkey string) (*SetBlePasskeyResponse, error) {
+	raw, err := c.proto.Call(ctx, "bramble.setBlePasskey", map[string]string{"passkey": passkey})
+	if err != nil {
+		return nil, err
+	}
+	var resp SetBlePasskeyResponse
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("bramble: decode SetBlePasskeyResponse: %w", err)
+	}
+	return &resp, nil
 }
 
 // SetBroadcastTelemetryMode updates broadcast telemetry mode.
