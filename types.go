@@ -190,65 +190,54 @@ type DiagnosticsBackpressure struct {
 	ProbeIngress DiagnosticsProbeIngress `json:"probe_ingress"`
 }
 
-// DiagnosticsRadioHealth reports what the radio will say about its own
-// transmit path. Neither the commanded nor the radiated output power can be
-// read back from an SX1262: SetTxParams and SetPaConfig are write-only
-// op-codes. So this pairs the level the driver programmed with the evidence
-// the chip does expose, which is enough to catch a dead PA, an unlocked PLL,
-// or config writes that never landed. Confirming the level actually radiated
-// needs external instrumentation.
+// DiagnosticsRadioHealth reports what the radio says about its own transmit
+// path. No supported part can read back its commanded or radiated output
+// power: on the SX1262, SetTxParams and SetPaConfig are write-only op-codes
+// and no register reports output power. So this pairs the level the driver
+// programmed with the faults the chip will admit to, which is enough to catch
+// a dead PA, an unlocked synthesizer, a failed calibration, or config writes
+// that never landed. Confirming the level actually radiated needs external
+// instrumentation.
+//
+// The verdicts are deliberately generic rather than one part's register
+// layout, so they stay meaningful as other radios learn to answer them. The
+// chip-specific raw values ride along in Detail as human-readable text.
 //
 // Every field beyond Supported and TxPowerDBm is a pointer because it is only
-// populated when Supported is true. A nil pointer means "the driver could not
-// read this", which is not the same as a zero readback: OCPOK false, for
-// example, is a hard fault signal, so it must not be reachable by an absent
-// field decoding to false.
+// populated when Supported is true. A nil pointer means "the radio did not
+// report this", which is not the same as a false verdict: ConfigVerified
+// false, for example, is a hard fault signal, so it must not be reachable by
+// an absent field decoding to false.
 type DiagnosticsRadioHealth struct {
-	// Supported is false when the driver has no SX1262 to interrogate (the
-	// emulator's virtual radio, or the LR1110 target, whose status and error
-	// words do not share this layout). Only TxPowerDBm is populated then.
+	// Supported is false when the driver cannot interrogate its transmit path:
+	// the emulator's virtual radio, or a part whose mapping is not
+	// implemented. Only TxPowerDBm is populated then.
 	Supported bool `json:"supported"`
-	// TxPowerDBm is the output power the driver programmed via SetTxParams,
-	// after clamping to the chip's -9..+22 dBm range. This is intent, not
-	// measurement.
+	// TxPowerDBm is the output power the driver programmed, after clamping to
+	// the radio's own range. This is intent, not measurement.
 	TxPowerDBm int `json:"tx_power_dbm"`
-	// DeviceErrors is the raw GetDeviceErrors bitmask.
-	DeviceErrors *int `json:"device_errors,omitempty"`
-	// DeviceErrorsStr holds space-separated flag names for DeviceErrors, or
-	// "none". Flags are PA_RAMP, PLL_LOCK, XOSC_START, IMG_CALIB, ADC_CALIB,
-	// PLL_CALIB, RC13M_CALIB and RC64K_CALIB.
-	DeviceErrorsStr *string `json:"device_errors_str,omitempty"`
-	// PARampError reports the latched PA_RAMP flag: the power amplifier did
-	// not ramp for a transmit, so nothing usable went on air. This is the
-	// strongest on-chip signal that commanded power is not being produced.
-	PARampError *bool `json:"pa_ramp_error,omitempty"`
-	// Status is the raw GetStatus byte.
-	Status *int `json:"status,omitempty"`
-	// ChipMode is the chip mode decoded from Status: STBY_RC, STBY_XOSC, FS,
-	// RX, TX or UNKNOWN.
-	ChipMode *string `json:"chip_mode,omitempty"`
-	// CmdStatus is the last-command status decoded from Status:
-	// data-available, timeout, processing-error, exec-failed, tx-done or
-	// reserved. exec-failed and processing-error mean the chip rejected a
-	// command.
-	CmdStatus *string `json:"cmd_status,omitempty"`
-	// OCP is the over-current protection register readback.
-	OCP *int `json:"ocp,omitempty"`
-	// OCPExpected is the OCP value the driver programmed for the high-power PA.
-	OCPExpected *int `json:"ocp_expected,omitempty"`
-	// OCPOK false means PA configuration writes are not reaching the chip,
-	// which caps output well below the commanded level. OCP is the only
-	// PA-side register that reads back, so this is the proof that the
-	// SetPaConfig path works at all.
-	OCPOK *bool `json:"ocp_ok,omitempty"`
-	// PADutyCycle is paDutyCycle from the selected SetPaConfig operating point.
-	PADutyCycle *int `json:"pa_duty_cycle,omitempty"`
-	// PAHPMax is hpMax from the selected SetPaConfig operating point.
-	PAHPMax *int `json:"pa_hp_max,omitempty"`
-	// PARatedDBm is the output level the selected PA operating point is
-	// characterized for. The driver picks the lowest characterized point that
-	// still covers the requested power.
-	PARatedDBm *int `json:"pa_rated_dbm,omitempty"`
+	// Chip names the radio part that answered, for example "SX1262".
+	Chip *string `json:"chip,omitempty"`
+	// PAFault reports that the power amplifier did not ramp for a transmit, so
+	// nothing usable went on air. This is the strongest evidence a chip can
+	// give that the commanded power is not being produced.
+	PAFault *bool `json:"pa_fault,omitempty"`
+	// PLLFault reports that the frequency synthesizer did not lock.
+	PLLFault *bool `json:"pll_fault,omitempty"`
+	// OscillatorFault reports that the reference oscillator did not start.
+	OscillatorFault *bool `json:"oscillator_fault,omitempty"`
+	// CalibrationFault reports that a calibration block failed. It costs link
+	// budget silently, without failing any later command.
+	CalibrationFault *bool `json:"calibration_fault,omitempty"`
+	// ConfigVerified reports that configuration written to the chip reads back
+	// as programmed. False means config writes are not landing, which caps
+	// output well below the commanded level.
+	ConfigVerified *bool `json:"config_verified,omitempty"`
+	// Detail carries chip-specific supporting values as human-readable text,
+	// for example decoded error flag names, chip mode and PA settings. It is
+	// intended for display and logs. Do not parse it: the format is the
+	// driver's to choose and may change with the part.
+	Detail *string `json:"detail,omitempty"`
 }
 
 // DiagnosticsResponse is returned by bramble.getDiagnostics.

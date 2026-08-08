@@ -40,18 +40,13 @@ const fullDiagnosticsPayload = `{
   "radio_health": {
     "supported": true,
     "tx_power_dbm": 22,
-    "device_errors": 0,
-    "device_errors_str": "none",
-    "pa_ramp_error": false,
-    "status": 44,
-    "chip_mode": "STBY_RC",
-    "cmd_status": "data-available",
-    "ocp": 56,
-    "ocp_expected": 56,
-    "ocp_ok": true,
-    "pa_duty_cycle": 4,
-    "pa_hp_max": 7,
-    "pa_rated_dbm": 22
+    "chip": "SX1262",
+    "pa_fault": false,
+    "pll_fault": false,
+    "oscillator_fault": false,
+    "calibration_fault": false,
+    "config_verified": true,
+    "detail": "errors none, mode STBY_RC, last-cmd data-available, ocp 0x38"
   },
   "gps_rx_bytes": 98304,
   "gps_rx_lines": 1521,
@@ -88,20 +83,15 @@ func fullDiagnosticsWant() DiagnosticsResponse {
 			},
 		},
 		RadioHealth: &DiagnosticsRadioHealth{
-			Supported:       true,
-			TxPowerDBm:      22,
-			DeviceErrors:    ptr(0),
-			DeviceErrorsStr: ptr("none"),
-			PARampError:     ptr(false),
-			Status:          ptr(44),
-			ChipMode:        ptr("STBY_RC"),
-			CmdStatus:       ptr("data-available"),
-			OCP:             ptr(56),
-			OCPExpected:     ptr(56),
-			OCPOK:           ptr(true),
-			PADutyCycle:     ptr(4),
-			PAHPMax:         ptr(7),
-			PARatedDBm:      ptr(22),
+			Supported:        true,
+			TxPowerDBm:       22,
+			Chip:             ptr("SX1262"),
+			PAFault:          ptr(false),
+			PLLFault:         ptr(false),
+			OscillatorFault:  ptr(false),
+			CalibrationFault: ptr(false),
+			ConfigVerified:   ptr(true),
+			Detail:           ptr("errors none, mode STBY_RC, last-cmd data-available, ocp 0x38"),
 		},
 		GPSRxBytes:     ptr(98304.0),
 		GPSRxLines:     ptr(1521.0),
@@ -224,57 +214,76 @@ func TestDiagnosticsResponseOptionalFieldsAbsent(t *testing.T) {
 			},
 		},
 		{
+			// The emulator's virtual radio and any part whose mapping is not
+			// implemented report exactly this. It is the shape most likely to
+			// regress, because every optional field is absent at once.
 			name:    "radio health unsupported",
 			payload: `{"uptime_s":10,"free_heap":1000,"heap":{},"task_stack_hwm":[],"radio_health":{"supported":false,"tx_power_dbm":17}}`,
-			check: func(t *testing.T, d DiagnosticsResponse) {
-				t.Helper()
-				if d.RadioHealth == nil {
-					t.Fatal("RadioHealth must be present")
-				}
-				if d.RadioHealth.Supported {
-					t.Fatal("Supported must decode as false")
-				}
-				if d.RadioHealth.TxPowerDBm != 17 {
-					t.Fatalf("TxPowerDBm = %d, want 17", d.RadioHealth.TxPowerDBm)
-				}
-				// Nothing else is populated when the driver has no SX1262 to
-				// interrogate. OCPOK in particular must stay nil rather than
-				// decoding to false, which would read as a PA config fault.
-				if d.RadioHealth.OCPOK != nil {
-					t.Fatalf("OCPOK must be nil when unsupported, got %v", *d.RadioHealth.OCPOK)
-				}
-				if d.RadioHealth.PARampError != nil {
-					t.Fatalf("PARampError must be nil when unsupported, got %v", *d.RadioHealth.PARampError)
-				}
-				if d.RadioHealth.DeviceErrors != nil {
-					t.Fatalf("DeviceErrors must be nil when unsupported, got %v", *d.RadioHealth.DeviceErrors)
-				}
-				if d.RadioHealth.ChipMode != nil {
-					t.Fatalf("ChipMode must be nil when unsupported, got %q", *d.RadioHealth.ChipMode)
-				}
-			},
-		},
-		{
-			name:    "radio health supported with faults",
-			payload: `{"uptime_s":10,"free_heap":1000,"heap":{},"task_stack_hwm":[],"radio_health":{"supported":true,"tx_power_dbm":22,"device_errors":1,"device_errors_str":"PA_RAMP","pa_ramp_error":true,"ocp":0,"ocp_expected":56,"ocp_ok":false}}`,
 			check: func(t *testing.T, d DiagnosticsResponse) {
 				t.Helper()
 				rh := d.RadioHealth
 				if rh == nil {
 					t.Fatal("RadioHealth must be present")
 				}
-				if rh.PARampError == nil || !*rh.PARampError {
-					t.Fatalf("PARampError must decode as a present true, got %v", rh.PARampError)
+				if rh.Supported {
+					t.Fatal("Supported must decode as false")
+				}
+				if rh.TxPowerDBm != 17 {
+					t.Fatalf("TxPowerDBm = %d, want 17", rh.TxPowerDBm)
+				}
+				// Nothing else is populated. Checked exhaustively rather than
+				// by sample: ConfigVerified and the fault verdicts must stay
+				// nil rather than decoding to false, which would read as
+				// "checked, no fault" for ConfigVerified and as a clean bill
+				// of health for the rest.
+				for name, got := range map[string]*bool{
+					"PAFault":          rh.PAFault,
+					"PLLFault":         rh.PLLFault,
+					"OscillatorFault":  rh.OscillatorFault,
+					"CalibrationFault": rh.CalibrationFault,
+					"ConfigVerified":   rh.ConfigVerified,
+				} {
+					if got != nil {
+						t.Fatalf("%s must be nil when unsupported, got %v", name, *got)
+					}
+				}
+				if rh.Chip != nil {
+					t.Fatalf("Chip must be nil when unsupported, got %q", *rh.Chip)
+				}
+				if rh.Detail != nil {
+					t.Fatalf("Detail must be nil when unsupported, got %q", *rh.Detail)
+				}
+			},
+		},
+		{
+			name:    "radio health supported with faults",
+			payload: `{"uptime_s":10,"free_heap":1000,"heap":{},"task_stack_hwm":[],"radio_health":{"supported":true,"tx_power_dbm":22,"chip":"SX1262","pa_fault":true,"pll_fault":false,"oscillator_fault":false,"calibration_fault":true,"config_verified":false,"detail":"errors PA_RAMP IMG_CALIB, mode STBY_RC, last-cmd exec-failed, ocp 0x18 expected 0x38"}}`,
+			check: func(t *testing.T, d DiagnosticsResponse) {
+				t.Helper()
+				rh := d.RadioHealth
+				if rh == nil {
+					t.Fatal("RadioHealth must be present")
+				}
+				if rh.PAFault == nil || !*rh.PAFault {
+					t.Fatalf("PAFault must decode as a present true, got %v", rh.PAFault)
+				}
+				if rh.CalibrationFault == nil || !*rh.CalibrationFault {
+					t.Fatalf("CalibrationFault must decode as a present true, got %v", rh.CalibrationFault)
 				}
 				// A present false is a fault report, distinct from nil.
-				if rh.OCPOK == nil || *rh.OCPOK {
-					t.Fatalf("OCPOK must decode as a present false, got %v", rh.OCPOK)
+				if rh.ConfigVerified == nil || *rh.ConfigVerified {
+					t.Fatalf("ConfigVerified must decode as a present false, got %v", rh.ConfigVerified)
 				}
-				if rh.OCP == nil || *rh.OCP != 0 {
-					t.Fatalf("OCP must decode as a present zero, got %v", rh.OCP)
+				// A present false here is a clean verdict, also distinct from
+				// nil: the synthesizer was checked and did lock.
+				if rh.PLLFault == nil || *rh.PLLFault {
+					t.Fatalf("PLLFault must decode as a present false, got %v", rh.PLLFault)
 				}
-				if rh.DeviceErrorsStr == nil || *rh.DeviceErrorsStr != "PA_RAMP" {
-					t.Fatalf("DeviceErrorsStr = %v, want PA_RAMP", rh.DeviceErrorsStr)
+				if rh.Chip == nil || *rh.Chip != "SX1262" {
+					t.Fatalf("Chip = %v, want SX1262", rh.Chip)
+				}
+				if rh.Detail == nil || *rh.Detail == "" {
+					t.Fatalf("Detail must decode as a present non-empty string, got %v", rh.Detail)
 				}
 			},
 		},
