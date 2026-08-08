@@ -20,9 +20,9 @@ func TestClient_ExportTopology(t *testing.T) {
 		`"tx_power_dbm":17,"region":"US915","regulatory":"FCC","max_duty_cycle_pct":100,` +
 		`"duty_cycle_enforced":false},` +
 		`"neighbors":[{"address":"DEADBEEF","name":"ridge-2","rssi":-92,"snr":6.5,` +
-		`"last_seen_ms":4200,"delivery_rate":250,"airtime_remaining":88}],` +
+		`"deliveryRate":250,"airtimeRemaining":88,"last_seen_ms":4200}],` +
 		`"routes":[{"dest":"CAFEBABE","next_hop":"DEADBEEF","hop_count":2,"metric":140,` +
-		`"state":"active","last_used_ms":1500,"use_count":9}]}}`)
+		`"state":"active","use_count":9}]}}`)
 
 	export, err := c.ExportTopology(ctx)
 	if err != nil {
@@ -57,16 +57,25 @@ func TestClient_ExportTopology(t *testing.T) {
 	if len(export.Neighbors) != 1 {
 		t.Fatalf("got %d neighbors, want 1", len(export.Neighbors))
 	}
+	// Every field of the Neighbor schema is asserted: a tag that drifts from
+	// the wire decodes to a zero value that no error surfaces, so an
+	// unchecked field is an unguarded one.
 	n := export.Neighbors[0]
-	if n.Address != "DEADBEEF" || n.RSSI != -92 || n.SNR != 6.5 || n.LastSeenAgoMs != 4200 {
-		t.Errorf("neighbor decoded as %+v", n)
+	if n.Address != "DEADBEEF" || n.Name != "ridge-2" || n.RSSI != -92 || n.SNR != 6.5 {
+		t.Errorf("neighbor identity and signal decoded as %+v", n)
+	}
+	if n.DeliveryRate != 250 || n.AirtimeRemaining != 88 || n.LastSeenAgoMs != 4200 {
+		t.Errorf("neighbor link quality decoded as %+v", n)
 	}
 	if len(export.Routes) != 1 {
 		t.Fatalf("got %d routes, want 1", len(export.Routes))
 	}
 	r := export.Routes[0]
-	if r.Dest != "CAFEBABE" || r.NextHop != "DEADBEEF" || r.HopCount != 2 || r.State != "active" {
-		t.Errorf("route decoded as %+v", r)
+	if r.Dest != "CAFEBABE" || r.NextHop != "DEADBEEF" || r.HopCount != 2 {
+		t.Errorf("route path decoded as %+v", r)
+	}
+	if r.Metric != 140 || r.State != "active" || r.UseCount != 9 {
+		t.Errorf("route cost and state decoded as %+v", r)
 	}
 
 	sent := mock.Sent()

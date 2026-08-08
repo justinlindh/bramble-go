@@ -153,8 +153,10 @@ func TestSendProbeResultUnmarshalFirmwareFormat(t *testing.T) {
 }
 
 func TestNeighborUnmarshalDeliveryRateAndAirtime(t *testing.T) {
-	// Firmware sends delivery_rate and airtime_remaining as snake_case.
-	in := []byte(`{"address":"AABBCCDD","rssi":-80,"snr":7.5,"last_seen_ms":1000,"delivery_rate":204,"airtime_remaining":75}`)
+	// Firmware sends deliveryRate and airtimeRemaining as camelCase, and
+	// last_seen_ms as snake_case: the Neighbor schema in api/openapi.yaml and
+	// main/topology_export.c both spell them that way.
+	in := []byte(`{"address":"AABBCCDD","rssi":-80,"snr":7.5,"deliveryRate":204,"airtimeRemaining":75,"last_seen_ms":1000}`)
 	var n Neighbor
 	if err := json.Unmarshal(in, &n); err != nil {
 		t.Fatalf("unmarshal failed: %v", err)

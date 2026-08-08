@@ -399,21 +399,25 @@ type Neighbor struct {
 	// LastSeenAgoMs is milliseconds since this neighbor was last heard
 	// (relative duration, not an absolute timestamp).
 	LastSeenAgoMs int64 `json:"last_seen_ms"`
-	// DeliveryRate is 0-255 where 255 = 100% packet delivery rate.
-	DeliveryRate int `json:"delivery_rate"`
-	// AirtimeRemaining is 0-100% airtime budget remaining for this neighbor.
-	AirtimeRemaining int `json:"airtime_remaining"`
+	// DeliveryRate is 0-255 where 255 = 100% packet delivery rate. The wire
+	// key is camelCase, matching the Neighbor schema in api/openapi.yaml and
+	// the emitter in main/topology_export.c.
+	DeliveryRate int `json:"deliveryRate"`
+	// AirtimeRemaining is the neighbor-advertised airtime budget remaining.
+	AirtimeRemaining int `json:"airtimeRemaining"`
 }
 
-// Route is a routing table entry.
+// Route is a routing table entry. The fields are exactly the six the Route
+// schema in api/openapi.yaml declares required and main/topology_export.c
+// emits, for both bramble.getRoutes and bramble.exportTopology.
 type Route struct {
-	Dest       string `json:"dest"`
-	NextHop    string `json:"next_hop"`
-	HopCount   int    `json:"hop_count"`
-	Metric     int    `json:"metric"`
-	State      string `json:"state"`
-	LastUsedMs int64  `json:"last_used_ms"`
-	UseCount   int    `json:"use_count,omitempty"`
+	Dest     string `json:"dest"`
+	NextHop  string `json:"next_hop"`
+	HopCount int    `json:"hop_count"`
+	Metric   int    `json:"metric"`
+	// State is one of discovering, unverified, active, stale, broken, unknown.
+	State    string `json:"state"`
+	UseCount int    `json:"use_count"`
 }
 
 // DmSession is one used slot of the node's DM session table, as returned by
