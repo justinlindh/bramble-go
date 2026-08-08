@@ -9,6 +9,7 @@ Full method and callback reference for `bramble-go`.
   - [Query Usage Examples](#query-usage-examples)
 - [Action Methods](#action-methods)
   - [Action and Debug Usage Examples](#action-and-debug-usage-examples)
+- [Provisioning](#provisioning)
 - [Notification Callbacks](#notification-callbacks)
 - [Key Types](#key-types)
   - [Optional Fields](#optional-fields)
@@ -44,6 +45,8 @@ All methods accept a `context.Context` for timeout/cancellation.
 | `AudioStatus(ctx)` | `*AudioStatus` | Audio availability, volume, mute, and playback state |
 | `StorageInfo(ctx)` | `*StorageInfo` | Board storage status (SD card presence and mount point) |
 | `AuthToken(ctx)` | `(string, error)` | Retrieve the device's WebSocket auth token (typically over serial) |
+| `NetworkKeyStatus(ctx)` | `*NetworkKeyStatusResponse` | Whether the node holds a network key, and that key's one-way fingerprint |
+| `AnchorStatus(ctx)` | `*AnchorStatusResponse` | Whether a fleet trust anchor is provisioned, and whether this node is endorsed |
 | `BleSecurity(ctx)` | `*BleSecurity` | BLE pairing mode and whether a static passkey is stored (the passkey itself is never returned) |
 
 ### Query Usage Examples
@@ -104,6 +107,10 @@ fmt.Println("auth token:", token)
 | `SetTrafficDebug(ctx, params)` | `*SetTrafficDebugResponse` | Configure traffic debug telemetry capture |
 | `SetBeaconPolicy(ctx, params)` | `error` | Update adaptive beaconing policy settings |
 | `SetAuthToken(ctx, token)` | `error` | Set or clear the device's WebSocket auth token |
+| `SetNetworkKey(ctx, keyHex)` | `error` | Provision the control-plane network key, joining the node to that network |
+| `GenerateNetworkKey(ctx)` | `*GenerateNetworkKeyResponse` | Mint a key on the node, provision it, and return it once (founds a network) |
+| `SetAnchor(ctx, anchorPubHex)` | `error` | Provision the fleet trust anchor's public key |
+| `SetEndorsement(ctx, notAfterHex, sigHex)` | `error` | Apply an anchor-signed endorsement cert to the node |
 | `SetBlePasskey(ctx, passkey)` | `*SetBlePasskeyResponse` | Set the 6-digit static BLE pairing passkey, or clear it with an empty string; wipes all BLE bonds |
 | `SetBroadcastTelemetryMode(ctx, mode)` | `*SetBroadcastTelemetryModeResponse` | Update broadcast telemetry mode |
 | `SetBacklight(ctx, level)` | `*BacklightResponse` | Set display backlight level (0–255) |
@@ -181,6 +188,46 @@ _ = client.PlayTone(ctx, "startup")
 _ = client.SetVolume(ctx, 75)
 _ = client.SetMuted(ctx, false)
 ```
+
+## Provisioning
+
+A node ships with no network key and is **inert**: it neither emits nor accepts authenticated control-plane traffic, so it does not mesh until a key is provisioned. Provisioning is therefore the first thing you do to a new node, before anything else in this API is useful on the radio.
+
+There are two paths, and they differ only in where the key comes from. To **found** a network, call `GenerateNetworkKey` on the first node: it mints an entropy-gated key on the device, provisions itself atomically, and returns the raw key exactly once. To **join** an existing network, pass that same key to `SetNetworkKey` on every other node.
+
+The key is write-only at the device boundary. No API reads a provisioned key back, so the copy `GenerateNetworkKey` returns is the only copy that will ever exist: record it out of band before you rely on it, and never log it. What you can read back is `NetworkKeyStatus`, which reports a one-way fingerprint (`SHA256(key)[0:4]`). Nodes showing the same fingerprint hold the same key, which is how you confirm a fleet converged without moving the secret again.
+
+These helpers need no device and are safe to use offline:
+
+| Helper | Returns | Description |
+|--------|---------|-------------|
+| `GenerateNetworkKeySeed()` | `([]byte, error)` | Mint a 32-byte key on this host (prefer `GenerateNetworkKey` on the node) |
+| `NetworkKeyFingerprint(key)` | `string` | `SHA256(key)[0:4]` as 8 lowercase hex, matching what every node reports |
+| `EncodeNetworkKeyShare(key)` | `(string, error)` | Encode a key as the `bramble://net/v1?k=` share string the webapp QR emits |
+| `ParseNetworkKeyShare(s)` | `([]byte, error)` | Parse that share string, or a bare 64-hex key |
+
+```go
+// Found a network on the first node.
+gen, err := client.GenerateNetworkKey(ctx)
+if err != nil {
+    log.Fatalf("found network: %v", err)
+}
+// gen.Key is the only copy. Record it out of band right here.
+fmt.Println("fingerprint:", gen.Fingerprint)
+
+// Join every other node to it.
+if err := other.SetNetworkKey(ctx, gen.Key); err != nil {
+    log.Fatalf("join network: %v", err)
+}
+
+// Confirm convergence: same fingerprint means same key.
+st, _ := other.NetworkKeyStatus(ctx)
+if !st.Provisioned || st.Fingerprint != gen.Fingerprint {
+    log.Fatalf("node did not converge: provisioned=%v fingerprint=%s", st.Provisioned, st.Fingerprint)
+}
+```
+
+A network key admits members but does not stop a member from minting extra identities. To close that too, provision a fleet **trust anchor** (`SetAnchor`) and enroll each node with an anchor-signed cert (`SetEndorsement`); `AnchorStatus` reports both the anchor fingerprint and whether this node is endorsed. The anchor's private seed stays in your client and is never sent to a node. `GenerateAnchorSeed`, `AnchorPublicKey`, `AnchorFingerprint`, `SignEndorsementHex`, `EncodeAnchorBackup`, and `ParseAnchorBackup` are the offline half of that ceremony.
 
 ## Notification Callbacks
 
